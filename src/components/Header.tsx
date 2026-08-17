@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation"
 import logoname from '../../public/images/PT-logoLogo-STJ.png'
 import { useAuth } from "@/contexts/auth";
 
-const NAVEGACAO = ["Pesquisa", "Índices"]
+const NAVEGACAO = ["Pesquisa", "Índices", "Boletim"]
 
 export default function Header(props: { keys_to_remove: string[] }) {
     const pathname = usePathname();
