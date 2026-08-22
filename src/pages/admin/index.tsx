@@ -21,7 +21,7 @@ export const getServerSideProps = LoggerServerSideProps(withAuthentication<Index
 export default function IndexPage({ role }: IndexPageProps) {
     const can = (feature: Feature) => roleCanAccess(role, feature);
     const data = useFetch<AdminOverviewResponse>("/api/admin/overview", []);
-    const [activeTab, setActiveTab] = useState<"overview" | "logs" | "quality">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "metrics" | "logs" | "quality">("overview");
 
     // Estados dos Filtros do Event Log
     const [logSearch, setLogSearch] = useState("");
@@ -100,7 +100,7 @@ export default function IndexPage({ role }: IndexPageProps) {
                             <h1 className="m-0 fs-3 fw-bold text-dark">Consola de Administração & Servidor</h1>
                         </div>
                         <p className="text-muted small mb-0 mt-1">
-                            Monitorização de telemetria, integridade do cluster, registo de eventos operacionais e gestão do sistema.
+                            Monitorização de telemetria, integridade do cluster, recursos do servidor (RAM/Disco) e gestão do sistema.
                         </p>
                     </div>
 
@@ -120,7 +120,7 @@ export default function IndexPage({ role }: IndexPageProps) {
                     <Loading />
                 ) : (
                     <>
-                        {/* Banner de Estado do Servidor / Cluster */}
+                        {/* Banner de Estado do Servidor / Cluster com Mini Telemetria de Hardware */}
                         <div className="card shadow-sm border-0 mb-4 bg-light">
                             <div className="card-body p-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
                                 <div className="d-flex align-items-center gap-3">
@@ -161,10 +161,25 @@ export default function IndexPage({ role }: IndexPageProps) {
                                     </div>
                                 </div>
 
-                                <div className="d-flex align-items-center gap-2">
-                                    <span className="badge bg-white text-dark border py-2 px-3 small">
-                                        <i className="bi bi-clock-history text-danger me-1"></i> Último Sync ETL: <strong>{data.etlSummary.lastRunDate}</strong>
-                                    </span>
+                                {/* Mini Indicadores Rápidos de RAM, Armazenamento e Uptime */}
+                                <div className="d-flex align-items-center gap-3 flex-wrap small">
+                                    <div className="bg-white border rounded-3 px-3 py-1">
+                                        <i className="bi bi-memory text-primary me-1"></i>
+                                        <span className="text-muted">RAM: </span>
+                                        <strong>{data.serverMetrics?.ram?.usedGb} GB</strong> / {data.serverMetrics?.ram?.totalGb} GB ({data.serverMetrics?.ram?.usedPercent}%)
+                                    </div>
+
+                                    <div className="bg-white border rounded-3 px-3 py-1">
+                                        <i className="bi bi-device-hdd-fill text-warning me-1"></i>
+                                        <span className="text-muted">Disco: </span>
+                                        <strong>{data.serverMetrics?.storage?.usedGb} GB</strong> / {data.serverMetrics?.storage?.totalGb} GB ({data.serverMetrics?.storage?.usedPercent}%)
+                                    </div>
+
+                                    <div className="bg-white border rounded-3 px-3 py-1">
+                                        <i className="bi bi-clock-history text-success me-1"></i>
+                                        <span className="text-muted">Uptime: </span>
+                                        <strong>{data.serverMetrics?.system?.uptimeFormatted}</strong>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -241,7 +256,7 @@ export default function IndexPage({ role }: IndexPageProps) {
                         </div>
 
                         {/* Abas de Navegação dos Detalhes do Servidor */}
-                        <div className="d-flex gap-2 mb-3 border-bottom pb-2">
+                        <div className="d-flex gap-2 mb-3 border-bottom pb-2 flex-wrap">
                             <button
                                 type="button"
                                 className={`btn btn-sm rounded-pill px-3 fw-semibold ${activeTab === "overview" ? "btn-danger" : "btn-light border text-muted"}`}
@@ -251,10 +266,17 @@ export default function IndexPage({ role }: IndexPageProps) {
                             </button>
                             <button
                                 type="button"
+                                className={`btn btn-sm rounded-pill px-3 fw-semibold ${activeTab === "metrics" ? "btn-danger" : "btn-light border text-muted"}`}
+                                onClick={() => setActiveTab("metrics")}
+                            >
+                                <i className="bi bi-hdd-stack-fill me-1"></i> Recursos & Métricas do Servidor
+                            </button>
+                            <button
+                                type="button"
                                 className={`btn btn-sm rounded-pill px-3 fw-semibold ${activeTab === "logs" ? "btn-danger" : "btn-light border text-muted"}`}
                                 onClick={() => setActiveTab("logs")}
                             >
-                                <i className="bi bi-activity me-1"></i> Event Log / Telemetria em Tempo Real
+                                <i className="bi bi-activity me-1"></i> Event Log / Telemetria
                                 <span className="badge bg-white text-danger ms-2 border">{data.eventLogs.length}</span>
                             </button>
                             <button
@@ -262,11 +284,11 @@ export default function IndexPage({ role }: IndexPageProps) {
                                 className={`btn btn-sm rounded-pill px-3 fw-semibold ${activeTab === "quality" ? "btn-danger" : "btn-light border text-muted"}`}
                                 onClick={() => setActiveTab("quality")}
                             >
-                                <i className="bi bi-database-check me-1"></i> Qualidade & Ingestão de Dados
+                                <i className="bi bi-database-check me-1"></i> Qualidade & Ingestão
                             </button>
                         </div>
 
-                        {/* Conteúdo da Aba: Módulos & Gestão */}
+                        {/* Conteúdo da Aba 1: Módulos & Gestão */}
                         {activeTab === "overview" && (
                             <div className="row g-4 mb-4">
                                 <div className="col-12 col-md-6 col-xl-4">
@@ -397,7 +419,162 @@ export default function IndexPage({ role }: IndexPageProps) {
                             </div>
                         )}
 
-                        {/* Conteúdo da Aba: Event Log / Telemetria com FILTROS AVANÇADOS */}
+                        {/* Conteúdo da Aba 2: Recursos & Hardware do Servidor (MÉTRICAS DE MEMÓRIA E ARMAZENAMENTO) */}
+                        {activeTab === "metrics" && data.serverMetrics && (
+                            <div className="row g-4 mb-4">
+                                {/* Painel de Memória RAM */}
+                                <div className="col-12 col-xl-6">
+                                    <div className="card shadow-sm border rounded-3 p-4 h-100 bg-white">
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 className="fs-6 fw-bold m-0 d-flex align-items-center gap-2">
+                                                <i className="bi bi-memory text-primary fs-5"></i> Estado da Memória RAM
+                                            </h5>
+                                            <span className={`badge ${data.serverMetrics.ram.usedPercent > 85 ? "bg-danger" : data.serverMetrics.ram.usedPercent > 65 ? "bg-warning text-dark" : "bg-success"}`}>
+                                                {data.serverMetrics.ram.usedPercent}% Em Uso
+                                            </span>
+                                        </div>
+
+                                        <div className="mb-3">
+                                            <div className="d-flex justify-content-between small fw-semibold mb-1">
+                                                <span>Utilização Total do Sistema Operativo:</span>
+                                                <span>{data.serverMetrics.ram.usedGb} GB / {data.serverMetrics.ram.totalGb} GB</span>
+                                            </div>
+                                            <div className="progress" style={{ height: 10 }}>
+                                                <div
+                                                    className={`progress-bar ${data.serverMetrics.ram.usedPercent > 85 ? "bg-danger" : data.serverMetrics.ram.usedPercent > 65 ? "bg-warning" : "bg-primary"}`}
+                                                    style={{ width: `${data.serverMetrics.ram.usedPercent}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="d-flex justify-content-between text-muted small mt-1">
+                                                <span>Livre: {data.serverMetrics.ram.freeGb} GB</span>
+                                                <span>Total: {data.serverMetrics.ram.totalGb} GB</span>
+                                            </div>
+                                        </div>
+
+                                        <hr className="my-3" />
+
+                                        <h6 className="small fw-bold text-muted text-uppercase mb-2">Processo Node.js / Next.js Heap</h6>
+                                        <div className="row g-2 text-center small">
+                                            <div className="col-4">
+                                                <div className="p-2 bg-light rounded-3 border">
+                                                    <div className="text-muted" style={{ fontSize: "11px" }}>Heap Utilizado</div>
+                                                    <div className="fw-bold text-primary fs-6">{data.serverMetrics.ram.processHeapUsedMb} MB</div>
+                                                </div>
+                                            </div>
+                                            <div className="col-4">
+                                                <div className="p-2 bg-light rounded-3 border">
+                                                    <div className="text-muted" style={{ fontSize: "11px" }}>Heap Alocado</div>
+                                                    <div className="fw-bold text-dark fs-6">{data.serverMetrics.ram.processHeapTotalMb} MB</div>
+                                                </div>
+                                            </div>
+                                            <div className="col-4">
+                                                <div className="p-2 bg-light rounded-3 border">
+                                                    <div className="text-muted" style={{ fontSize: "11px" }}>RSS Total</div>
+                                                    <div className="fw-bold text-secondary fs-6">{data.serverMetrics.ram.processRssMb} MB</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <hr className="my-3" />
+
+                                        <h6 className="small fw-bold text-muted text-uppercase mb-2">Elasticsearch JVM Heap (4 GB Alocado)</h6>
+                                        <div>
+                                            <div className="d-flex justify-content-between small fw-semibold mb-1">
+                                                <span>JVM Heap do Cluster:</span>
+                                                <span>{data.serverMetrics.elasticsearchJvm.heapUsedMb} MB / {data.serverMetrics.elasticsearchJvm.heapMaxMb} MB ({data.serverMetrics.elasticsearchJvm.heapUsedPercent}%)</span>
+                                            </div>
+                                            <div className="progress" style={{ height: 8 }}>
+                                                <div
+                                                    className="progress-bar bg-success"
+                                                    style={{ width: `${data.serverMetrics.elasticsearchJvm.heapUsedPercent}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Painel de Armazenamento & Disco */}
+                                <div className="col-12 col-xl-6">
+                                    <div className="card shadow-sm border rounded-3 p-4 h-100 bg-white">
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 className="fs-6 fw-bold m-0 d-flex align-items-center gap-2">
+                                                <i className="bi bi-device-hdd-fill text-warning fs-5"></i> Estado do Armazenamento & Disco
+                                            </h5>
+                                            <span className="badge bg-primary">
+                                                {data.serverMetrics.storage.usedPercent}% Ocupado
+                                            </span>
+                                        </div>
+
+                                        <div className="mb-3">
+                                            <div className="d-flex justify-content-between small fw-semibold mb-1">
+                                                <span>Espaço em Disco do Servidor:</span>
+                                                <span>{data.serverMetrics.storage.usedGb} GB / {data.serverMetrics.storage.totalGb} GB</span>
+                                            </div>
+                                            <div className="progress" style={{ height: 10 }}>
+                                                <div
+                                                    className="progress-bar bg-warning"
+                                                    style={{ width: `${data.serverMetrics.storage.usedPercent}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="d-flex justify-content-between text-muted small mt-1">
+                                                <span>Disponível: {data.serverMetrics.storage.freeGb} GB</span>
+                                                <span>Total: {data.serverMetrics.storage.totalGb} GB</span>
+                                            </div>
+                                        </div>
+
+                                        <hr className="my-3" />
+
+                                        <h6 className="small fw-bold text-muted text-uppercase mb-2">Volumes & Índices de Dados</h6>
+                                        <div className="list-group list-group-flush small">
+                                            <div className="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                                                <div>
+                                                    <i className="bi bi-database text-danger me-2"></i>
+                                                    <strong>Índice Elasticsearch (Jurisprudência)</strong>
+                                                </div>
+                                                <span className="badge bg-light text-dark border">
+                                                    {data.serverMetrics.storage.elasticsearchStoreSizeGb} GB
+                                                </span>
+                                            </div>
+
+                                            <div className="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                                                <div>
+                                                    <i className="bi bi-diagram-3 text-primary me-2"></i>
+                                                    <strong>Shards / Partições Lucene Ativas</strong>
+                                                </div>
+                                                <span className="badge bg-light text-dark border">
+                                                    {data.serverMetrics.elasticsearchJvm.shardsCount} Shards
+                                                </span>
+                                            </div>
+
+                                            <div className="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+                                                <div>
+                                                    <i className="bi bi-file-earmark-spreadsheet text-success me-2"></i>
+                                                    <strong>Volume de Ficheiros Excel / Exportações</strong>
+                                                </div>
+                                                <span className="badge bg-light text-dark border">
+                                                    {data.serverMetrics.storage.excelFilesCount} Ficheiros
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <hr className="my-3" />
+
+                                        <div className="p-3 bg-light rounded-3 border small text-muted">
+                                            <div className="d-flex justify-content-between mb-1">
+                                                <span><i className="bi bi-cpu me-1"></i> Processador:</span>
+                                                <strong className="text-dark">{data.serverMetrics.system.cpuCores} Cores &bull; {data.serverMetrics.system.cpuModel}</strong>
+                                            </div>
+                                            <div className="d-flex justify-content-between">
+                                                <span><i className="bi bi-gear me-1"></i> Ambiente / Node:</span>
+                                                <strong className="text-dark">{data.serverMetrics.system.platform} &bull; Node {data.serverMetrics.system.nodeVersion}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Conteúdo da Aba 3: Event Log / Telemetria com FILTROS AVANÇADOS */}
                         {activeTab === "logs" && (
                             <div className="card shadow-sm border rounded-3 p-3 mb-4">
                                 <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -601,7 +778,7 @@ export default function IndexPage({ role }: IndexPageProps) {
                             </div>
                         )}
 
-                        {/* Conteúdo da Aba: Qualidade & Ingestão */}
+                        {/* Conteúdo da Aba 4: Qualidade & Ingestão */}
                         {activeTab === "quality" && (
                             <div className="row g-4 mb-4">
                                 <div className="col-12 col-xl-6">
