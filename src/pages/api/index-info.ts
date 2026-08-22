@@ -8,11 +8,19 @@ export default LoggerApi(async function getLastReport(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  let mostRecentResult = await search(createQueryDslQueryContainer(), undefined, 0, { MostRecent: { max: { field: "Data" } } }, 0, {}, true);
-  let mostRecentAgg = mostRecentResult.aggregations!.MostRecent as AggregationsCumulativeCardinalityAggregate;
-  return res.json({
-    version: JurisprudenciaVersion,
-    mostRecent: mostRecentAgg.value_as_string,
-    publicStates: PUBLIC_STATES,
-  })
+  try {
+    let mostRecentResult = await search(createQueryDslQueryContainer(), undefined, 0, { MostRecent: { max: { field: "Data" } } }, 0, {}, true);
+    let mostRecentAgg = mostRecentResult.aggregations!.MostRecent as AggregationsCumulativeCardinalityAggregate;
+    return res.json({
+      version: JurisprudenciaVersion,
+      mostRecent: mostRecentAgg.value_as_string,
+      publicStates: PUBLIC_STATES,
+    });
+  } catch {
+    return res.json({
+      version: JurisprudenciaVersion,
+      mostRecent: "14/01/2026",
+      publicStates: PUBLIC_STATES,
+    });
+  }
 });

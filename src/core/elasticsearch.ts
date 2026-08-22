@@ -70,7 +70,15 @@ export const DEFAULT_AGGS = {
 };
 export const DEFAULT_RESULTS_PER_PAGE = 10;
 
-const _esClient = new Client({ node: process.env.ES_URL || "http://localhost:9200", auth: { username: "elastic", password: "elasticsearch" }, sniffOnStart: false, sniffOnConnectionFault: false, sniffInterval: false, maxRetries: 0 });
+const _esClient = new Client({
+    node: process.env.ES_URL || "http://localhost:9200",
+    auth: { username: "elastic", password: "elasticsearch" },
+    sniffOnStart: false,
+    sniffOnConnectionFault: false,
+    sniffInterval: false,
+    maxRetries: 0,
+    requestTimeout: 1500
+});
 
 export async function getElasticSearchClient() {
     return _esClient;
@@ -345,12 +353,13 @@ export function createQueryDslQueryContainer(string?: string | string[]): QueryD
 }
 
 export async function getSearchedArray(text: string): Promise<string[]> {
+    if (!text || text.trim().length === 0) return [];
     try {
         const c = await getElasticSearchClient();
         const r = await c.indices.analyze({ index: JurisprudenciaVersion, text: text });
         return r.tokens?.map((o) => o.token) || [];
-    } catch (e) {
-        return [] as string[];
+    } catch {
+        return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 0);
     }
 }
 

@@ -58,6 +58,21 @@ export default function Header(props: { keys_to_remove: string[] }) {
                     </li>)}
                     <li>|</li>
                     <li className="nav-link py-1 px-2 mx-1">
+                        <Link
+                            href="/dashboard"
+                            className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center gap-1 ${
+                                pathname === "/dashboard" 
+                                    ? "btn-danger text-white shadow-sm" 
+                                    : "btn-outline-danger"
+                            }`}
+                            style={{ transition: "all 0.2s ease-in-out" }}
+                        >
+                            <i className="bi bi-bar-chart-line-fill"></i>
+                            <span>Dashboard</span>
+                        </Link>
+                    </li>
+                    <li>|</li>
+                    <li className="nav-link py-1 px-2 mx-1">
                         <Link href={`#`} className="border-0 nav-link fs-6 bg-transparent" role="button" data-bs-toggle="modal" data-bs-target="#modal-about">Sobre</Link>
                     </li>
                 </ul>

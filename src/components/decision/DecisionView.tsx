@@ -15,13 +15,14 @@ export default function DecisionView(props: { doc: JurisprudenciaDocument, id: s
     let uuid = props.doc["UUID"]!;
     let related = useFetch<JurisprudenciaDocument[]>(`/api/related/${encodeURIComponent(proc)}/${uuid}`, []) || []
     const keyName = Object.fromEntries(props.keys.map(k => [k.key, k.name]));
+    const docAny = props.doc as any;
     const hasAnon     = !!(props.doc["Texto"] || props.doc["Sumário"]);
-    const hasOriginal = !!(props.doc["Texto Não Anonimizado"] || props.doc["Sumário Não Anonimizado"]);
+    const hasOriginal = !!(docAny["Texto Não Anonimizado"] || docAny["Sumário Não Anonimizado"]);
     const canSwitch   = hasAnon && hasOriginal;
     const showToggle  = !!auth && (hasAnon || hasOriginal);
     let [showOriginal, setShowOriginal] = useState(!hasAnon && hasOriginal);
-    let sumario = showOriginal ? (props.doc["Sumário Não Anonimizado"] ?? props.doc.Sumário) : (props.doc.Sumário || props.doc["Sumário Não Anonimizado"]);
-    let texto = showOriginal ? (props.doc["Texto Não Anonimizado"] ?? props.doc.Texto) : (props.doc.Texto || props.doc["Texto Não Anonimizado"]);
+    let sumario = showOriginal ? (docAny["Sumário Não Anonimizado"] ?? props.doc.Sumário) : (props.doc.Sumário || docAny["Sumário Não Anonimizado"]);
+    let texto = showOriginal ? (docAny["Texto Não Anonimizado"] ?? props.doc.Texto) : (props.doc.Texto || docAny["Texto Não Anonimizado"]);
     const sumarioIsOriginal = showOriginal || !props.doc.Sumário;
     const textoIsOriginal = showOriginal || !props.doc.Texto;
 

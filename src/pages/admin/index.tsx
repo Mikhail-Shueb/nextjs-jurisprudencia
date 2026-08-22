@@ -23,6 +23,9 @@ export default function IndexPage({ role }: IndexPageProps) {
             <div className="col-sm-12 col-md-8 col-xl-6">
                 <div className="card shadow">
                     <div className="card-body">
+                        <LinkEntry link="/dashboard" title="Dashboard Analítico e Estatísticas">
+                            <p>Visualizar métricas gerais, gráficos temporais e distribuição de jurisprudência</p>
+                        </LinkEntry>
                         <LinkEntry link="/pesquisa" title="Pesquisa">
                             <p>Pesquise normalmente pelos acórdãos. Terá acesso a mais informação e poderá abrir em modo de edição os acórdãos</p>
                         </LinkEntry>

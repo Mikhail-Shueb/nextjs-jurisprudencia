@@ -45,32 +45,30 @@ export default function JurisprudenciaItem({ hit, searchId }: { hit: SearchHandl
             <summary className="d-flex align-items-center list-unstyled">
                 <span style={{ width: "10%", flexShrink: 1 }}>
                     <i className="bi bi-caret-downright-fill"></i>
-                    <b className="mouse-click">{keys?.Sumário.name}:</b>
+                    <b className="mouse-click">{keys?.Sumário.name || "Sumário"}:</b>
                 </span>
-                <div className="highlight">
-
+                {((hit.highlight?.["SumárioMarks"] || (Array.isArray(hit.highlight?.Sumário) && typeof hit.highlight?.Sumário[0] === "object" ? hit.highlight?.Sumário : [])) as HighlightFragment[]).length > 0 ? <div className="highlight">
                     <div className="highlight-bar" data-key="Sumário">
-                        {(hit.highlight.Sumário as HighlightFragment[]).map((marker, i) => <div key={i} className="highlight-bar-hit-parent">
-                            <div className="highlight-bar-hit" data-offset={marker.offset} data-per={marker.offset / marker.size} style={{ left: `${marker.offset / marker.size * 100}%`, background: "green" }}></div>
+                        {((hit.highlight?.["SumárioMarks"] || (Array.isArray(hit.highlight?.Sumário) && typeof hit.highlight?.Sumário[0] === "object" ? hit.highlight?.Sumário : [])) as HighlightFragment[]).map((marker, i) => <div key={i} className="highlight-bar-hit-parent">
+                            <div className="highlight-bar-hit" data-offset={marker.offset} data-per={marker.offset / marker.size} style={{ left: `${(marker.offset / marker.size) * 100}%`, background: "green" }}></div>
                             <div className="highlight-bar-hit-content d-none" dangerouslySetInnerHTML={{ __html: marker.textFragment }}></div>
                         </div>)}
                     </div>
-                </div>
+                </div> : ""}
             </summary>
-            <div className="col-12 p-2 border pesquisa-sumario" dangerouslySetInnerHTML={{ __html: hit.highlight?.Sumário ? hit.highlight?.Sumário : hit._source.Sumário }} />
-
+            <div className="col-12 p-2 border pesquisa-sumario" dangerouslySetInnerHTML={{ __html: Array.isArray(hit.highlight?.Sumário) ? (typeof hit.highlight?.Sumário[0] === "string" ? hit.highlight?.Sumário[0] : hit._source.Sumário) : (hit.highlight?.Sumário || hit._source.Sumário) }} />
         </details> : ""}
 
         {hit.highlight?.Texto ? <details className="col-12 d-print-none">
             <summary className="d-flex align-items-center list-unstyled">
                 <span style={{ width: "10%", flexShrink: 1 }}>
                     <i className="bi bi-caret-downright-fill"></i>
-                    <b className="mouse-click">{keys?.Texto.name}</b>
+                    <b className="mouse-click">{keys?.Texto.name || "Texto"}:</b>
                 </span>
                 <div className="highlight">
                     <div className="highlight-bar" data-key="Texto">
                         {(hit.highlight.Texto as HighlightFragment[]).map((marker, i) => <div key={i} className="highlight-bar-hit-parent">
-                            <div className="highlight-bar-hit" data-offset={marker.offset} data-per={marker.offset / marker.size} style={{ left: `${marker.offset / marker.size * 100}%`, background: "green" }}></div>
+                            <div className="highlight-bar-hit" data-offset={marker.offset} data-per={marker.offset / marker.size} style={{ left: `${(marker.offset / marker.size) * 100}%`, background: "green" }}></div>
                             <div className="highlight-bar-hit-content d-none" dangerouslySetInnerHTML={{ __html: marker.textFragment }}></div>
                         </div>)}
                     </div>

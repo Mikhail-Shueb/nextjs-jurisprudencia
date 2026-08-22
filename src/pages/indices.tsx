@@ -40,6 +40,19 @@ export const getServerSideProps = LoggerServerSideProps(withForm<IndicesPageProp
 export default function Indices(props: IndicesPageProps){
     return <GenericPageWithForm escapeChildren={<HistogramModal />} {...props} title="Jurisprudência STJ - Índices">
         <Script src="https://cdn.plot.ly/plotly-2.12.1.min.js" />
+        <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2 pt-1 pb-2 border-bottom">
+            <div className="d-flex align-items-center gap-2">
+                <Link href="/dashboard" className="btn btn-outline-danger btn-sm rounded-pill px-3">
+                    <i className="bi bi-bar-chart-line-fill me-1"></i> Painel de Análise & Estatísticas
+                </Link>
+                <span className="btn btn-danger btn-sm rounded-pill px-3 fw-semibold">
+                    <i className="bi bi-grid-3x3-gap-fill me-1"></i> Matriz de Índices
+                </span>
+            </div>
+            <div className="text-muted small">
+                <i className="bi bi-info-circle me-1"></i> Cruzamento multi-dimensional de metadados
+            </div>
+        </div>
         <TermInfo term={props.term}/>
         <IndicesTable {...props}/>
     </GenericPageWithForm>

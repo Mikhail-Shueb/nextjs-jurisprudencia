@@ -13,7 +13,7 @@ interface UsersPageProps {
 
 export const getServerSideProps: GetServerSideProps<UsersPageProps> = LoggerServerSideProps(withRole('manageUsers', async (ctx) => {
     let r = await listUsers();
-    return { props: { users: r.hits.hits.map(({ _id, _source: u }) => ({ id: _id || "", username: u?.username || "", salt: u?.salt || "", hash: u?.hash || "", role: u?.role ?? 'admin' })) } }
+    return { props: { users: r.hits.hits.map((hit: any) => ({ id: hit._id || "", username: hit._source?.username || "", salt: hit._source?.salt || "", hash: hit._source?.hash || "", role: hit._source?.role ?? 'admin' })) } };
 }))
 
 export default function UsersPage({ users: initialUsers }: UsersPageProps) {
