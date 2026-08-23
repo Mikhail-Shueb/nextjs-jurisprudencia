@@ -369,7 +369,6 @@ const SYNC_BACK_MAX_BATCH_DOCS = 100;
 interface SyncBackPayload {
     action: "bulk-sync";
     batchIndex: number;
-    batchTotal: number;
     ts: number;
     documents: Record<string, any>[];
     sig: string;
@@ -382,18 +381,18 @@ export function isSyncImporting(): boolean {
     return syncImporting;
 }
 
-function computeSyncBackSig(secret: string, batchIndex: number, batchTotal: number, ts: number, documents: Record<string, any>[]): string {
+function computeSyncBackSig(secret: string, batchIndex: number, ts: number, documents: Record<string, any>[]): string {
     const documentsHash = crypto.createHash("sha256").update(JSON.stringify(documents)).digest("hex");
-    const data = JSON.stringify({ action: "bulk-sync", batchIndex, batchTotal, ts, documentsHash });
+    const data = JSON.stringify({ action: "bulk-sync", batchIndex, ts, documentsHash });
     return crypto.createHmac("sha256", secret).update(data).digest("hex");
 }
 
-function buildSyncBackPayload(batchIndex: number, batchTotal: number, documents: Record<string, any>[]): SyncBackPayload {
+function buildSyncBackPayload(batchIndex: number, documents: Record<string, any>[]): SyncBackPayload {
     const secret = process.env.SYNC_SECRET;
     if (!secret) throw new Error("SYNC_SECRET not configured");
     const ts = Date.now();
-    const sig = computeSyncBackSig(secret, batchIndex, batchTotal, ts, documents);
-    return { action: "bulk-sync", batchIndex, batchTotal, ts, documents, sig };
+    const sig = computeSyncBackSig(secret, batchIndex, ts, documents);
+    return { action: "bulk-sync", batchIndex, ts, documents, sig };
 }
 
 function verifySyncBackPayload(payload: SyncBackPayload): boolean {
@@ -406,7 +405,7 @@ function verifySyncBackPayload(payload: SyncBackPayload): boolean {
         console.warn("[email-sync-back] Payload expired (>24h old)");
         return false;
     }
-    const expected = computeSyncBackSig(secret, payload.batchIndex, payload.batchTotal, payload.ts, payload.documents);
+    const expected = computeSyncBackSig(secret, payload.batchIndex, payload.ts, payload.documents);
     try {
         return crypto.timingSafeEqual(Buffer.from(payload.sig, "hex"), Buffer.from(expected, "hex"));
     } catch {
@@ -473,11 +472,11 @@ export async function writeLastSyncSeqNo(seqNo: number): Promise<void> {
 
 // --- Externo: export ---
 
-async function sendSyncBackEmail(batchIndex: number, batchTotal: number, documents: Record<string, any>[]): Promise<void> {
+async function sendSyncBackEmail(batchIndex: number, documents: Record<string, any>[]): Promise<void> {
     const config = getMsConfig();
     const to = process.env.SYNC_MS_RECIPIENT || config.mailbox;
     const token = await getGraphToken(config.tenantId, config.clientId, config.clientSecret);
-    const payload = buildSyncBackPayload(batchIndex, batchTotal, documents);
+    const payload = buildSyncBackPayload(batchIndex, documents);
 
     const payloadJson = JSON.stringify(payload);
     const emailBody = `${SYNC_BODY_MARKER}${Buffer.from(payloadJson, "utf-8").toString("base64")}${SYNC_BODY_END}`;
@@ -490,7 +489,7 @@ async function sendSyncBackEmail(batchIndex: number, batchTotal: number, documen
         },
         body: JSON.stringify({
             message: {
-                subject: `${SYNC_BACK_SUBJECT_PREFIX} batch ${batchIndex + 1}/${batchTotal} (${documents.length} docs)`,
+                subject: `${SYNC_BACK_SUBJECT_PREFIX} batch ${batchIndex + 1} (${documents.length} docs)`,
                 body: { contentType: "Text", content: emailBody },
                 toRecipients: [{ emailAddress: { address: to } }],
             },
@@ -499,9 +498,9 @@ async function sendSyncBackEmail(batchIndex: number, batchTotal: number, documen
     });
 
     if (!resp.ok) {
-        throw new Error(`MS Graph sendMail failed for sync-back batch ${batchIndex + 1}/${batchTotal} (${resp.status}): ${await resp.text()}`);
+        throw new Error(`MS Graph sendMail failed for sync-back batch ${batchIndex + 1} (${resp.status}): ${await resp.text()}`);
     }
-    console.log(`[email-sync-back] Sent batch ${batchIndex + 1}/${batchTotal} with ${documents.length} documents`);
+    console.log(`[email-sync-back] Sent batch ${batchIndex + 1} with ${documents.length} documents`);
 }
 
 export async function sendBulkSyncEmails(): Promise<{ sent: number; documents: number; maxSeqNo: number }> {
@@ -509,19 +508,34 @@ export async function sendBulkSyncEmails(): Promise<{ sent: number; documents: n
     const lastSeqNo = await readLastSyncSeqNo();
     console.log(`[email-sync-back] Export starting — documents with _seq_no > ${lastSeqNo}`);
 
-    // Collect changed docs, batching by serialized size so each email stays
-    // under the Graph API request limit.
-    const batches: Record<string, any>[][] = [];
+    // Stream: fill one batch, send it, drop it. Only a single batch is ever held
+    // in memory, so a full-index export (tens of thousands of docs) cannot OOM
+    // the process. The bookmark is advanced after each successful send, so a
+    // failure part-way through resumes from the last sent batch rather than
+    // re-sending everything.
     let current: Record<string, any>[] = [];
     let currentBytes = 0;
-    let maxSeqNo = lastSeqNo;
+    let batchSeqNo = lastSeqNo;   // highest _seq_no included in `current`
+    let sentSeqNo = lastSeqNo;    // highest _seq_no already committed to the bookmark
+    let sent = 0;
     let totalDocs = 0;
     let searchAfter: any[] | undefined = undefined;
+
+    const flush = async () => {
+        if (current.length === 0) return;
+        await sendSyncBackEmail(sent, current);
+        sent++;
+        totalDocs += current.length;
+        sentSeqNo = batchSeqNo;
+        await writeLastSyncSeqNo(sentSeqNo);
+        current = [];
+        currentBytes = 0;
+    };
 
     for (;;) {
         const page: any = await client.search({
             index: JurisprudenciaVersion,
-            query: { range: { _seq_no: { gt: lastSeqNo } } },
+            query: { range: { _seq_no: { gt: sentSeqNo } } },
             sort: [{ _seq_no: "asc" }],
             seq_no_primary_term: true,
             size: 200,
@@ -534,31 +548,22 @@ export async function sendBulkSyncEmails(): Promise<{ sent: number; documents: n
             if (!hit._source) continue;
             const docBytes = JSON.stringify(hit._source).length;
             if (current.length > 0 && (currentBytes + docBytes > SYNC_BACK_MAX_BATCH_JSON_BYTES || current.length >= SYNC_BACK_MAX_BATCH_DOCS)) {
-                batches.push(current);
-                current = [];
-                currentBytes = 0;
+                await flush();
             }
             current.push(hit._source);
             currentBytes += docBytes;
-            totalDocs++;
-            if (typeof hit._seq_no === "number" && hit._seq_no > maxSeqNo) maxSeqNo = hit._seq_no;
+            if (typeof hit._seq_no === "number" && hit._seq_no > batchSeqNo) batchSeqNo = hit._seq_no;
         }
         searchAfter = hits[hits.length - 1].sort;
     }
-    if (current.length > 0) batches.push(current);
+    await flush();
 
-    if (batches.length === 0) {
+    if (sent === 0) {
         console.log("[email-sync-back] Nothing to export");
-        return { sent: 0, documents: 0, maxSeqNo: lastSeqNo };
+    } else {
+        console.log(`[email-sync-back] Export complete: ${sent} emails, ${totalDocs} documents, maxSeqNo=${sentSeqNo}`);
     }
-
-    for (let i = 0; i < batches.length; i++) {
-        await sendSyncBackEmail(i, batches.length, batches[i]);
-    }
-
-    await writeLastSyncSeqNo(maxSeqNo);
-    console.log(`[email-sync-back] Export complete: ${batches.length} emails, ${totalDocs} documents, maxSeqNo=${maxSeqNo}`);
-    return { sent: batches.length, documents: totalDocs, maxSeqNo };
+    return { sent, documents: totalDocs, maxSeqNo: sentSeqNo };
 }
 
 // --- Interno: import ---
@@ -650,11 +655,11 @@ export async function pollAndProcessBackSyncEmails(): Promise<{ processed: numbe
 
             try {
                 const { upserted, created } = await applyBulkSync(payload.documents);
-                console.log(`[email-sync-back] Applied batch ${payload.batchIndex + 1}/${payload.batchTotal}: ${upserted} overwritten, ${created} created`);
+                console.log(`[email-sync-back] Applied batch ${payload.batchIndex + 1}: ${upserted} overwritten, ${created} created`);
                 processed++;
                 documents += payload.documents.length;
             } catch (err) {
-                console.error(`[email-sync-back] Failed to apply batch ${payload.batchIndex + 1}/${payload.batchTotal}:`, err);
+                console.error(`[email-sync-back] Failed to apply batch ${payload.batchIndex + 1}:`, err);
                 errors++;
             }
 
