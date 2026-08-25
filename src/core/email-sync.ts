@@ -480,27 +480,43 @@ async function sendSyncBackEmail(batchIndex: number, documents: Record<string, a
 
     const payloadJson = JSON.stringify(payload);
     const emailBody = `${SYNC_BODY_MARKER}${Buffer.from(payloadJson, "utf-8").toString("base64")}${SYNC_BODY_END}`;
-
-    const resp = await fetch(`${GRAPH_BASE}/users/${encodeURIComponent(config.mailbox)}/sendMail`, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+    const requestBody = JSON.stringify({
+        message: {
+            subject: `${SYNC_BACK_SUBJECT_PREFIX} batch ${batchIndex + 1} (${documents.length} docs)`,
+            body: { contentType: "Text", content: emailBody },
+            toRecipients: [{ emailAddress: { address: to } }],
         },
-        body: JSON.stringify({
-            message: {
-                subject: `${SYNC_BACK_SUBJECT_PREFIX} batch ${batchIndex + 1} (${documents.length} docs)`,
-                body: { contentType: "Text", content: emailBody },
-                toRecipients: [{ emailAddress: { address: to } }],
-            },
-            saveToSentItems: false,
-        }),
+        saveToSentItems: false,
     });
 
-    if (!resp.ok) {
+    // Graph throttles sendMail by message rate and total bytes; on 429 it returns
+    // a Retry-After. Honour it (capped) and retry a few times before giving up.
+    const maxAttempts = 5;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const resp = await fetch(`${GRAPH_BASE}/users/${encodeURIComponent(config.mailbox)}/sendMail`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: requestBody,
+        });
+
+        if (resp.ok) {
+            console.log(`[email-sync-back] Sent batch ${batchIndex + 1} with ${documents.length} documents`);
+            return;
+        }
+
+        if (resp.status === 429 && attempt < maxAttempts) {
+            const retryAfter = parseInt(resp.headers.get("Retry-After") || "", 10);
+            const waitMs = Math.min(Number.isFinite(retryAfter) ? retryAfter * 1000 : attempt * 30_000, 120_000);
+            console.warn(`[email-sync-back] Throttled on batch ${batchIndex + 1} (attempt ${attempt}/${maxAttempts}), waiting ${Math.round(waitMs / 1000)}s`);
+            await new Promise(r => setTimeout(r, waitMs));
+            continue;
+        }
+
         throw new Error(`MS Graph sendMail failed for sync-back batch ${batchIndex + 1} (${resp.status}): ${await resp.text()}`);
     }
-    console.log(`[email-sync-back] Sent batch ${batchIndex + 1} with ${documents.length} documents`);
 }
 
 export async function sendBulkSyncEmails(): Promise<{ sent: number; documents: number; maxSeqNo: number }> {
