@@ -44,9 +44,9 @@ export default function IndexPage({ role, syncRole }: IndexPageProps) {
                             <p>Consultar o registo de ações realizadas no sistema</p>
                         </LinkEntry>}
                         {can('manageUsers') && syncRole === "interno" && <SyncTrigger
-                            title="Sincronizar com Externo"
-                            description="Importar as alterações enviadas pelo juris externo (o externo sobrepõe os dados locais)."
-                            endpoint="/api/gestao/sync-import"
+                            title="Pedir sincronização"
+                            description="Pedir ao juris externo as últimas alterações (o externo sobrepõe os dados locais). As alterações chegam dentro de ~1 min."
+                            endpoint="/api/gestao/sync-request"
                         />}
                         {can('manageUsers') && syncRole === "externo" && <SyncTrigger
                             title="Exportar para Interno"

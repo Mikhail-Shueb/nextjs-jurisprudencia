@@ -4,6 +4,10 @@ import { JurisprudenciaDocument, JurisprudenciaVersion } from "@stjiris/jurispru
 import { updateDoc } from "./doc";
 
 const SYNC_SUBJECT_PREFIX = "[JURIS-SYNC]";
+const SYNC_REQUEST_SUBJECT_PREFIX = "[JURIS-SYNC-REQUEST]";
+// Sentinel UUID for the empty pull-request payload — non-empty so decodeSyncBody's
+// truthiness check passes and the HMAC stays consistent with the single-doc format.
+const SYNC_REQUEST_UUID = "__sync_request__";
 // The payload is base64'd and wrapped in these markers in the email body, so mail
 // transforms (HTML conversion, entity encoding, appended disclaimers, line-wrapping)
 // can't corrupt it — the receiver extracts exactly what's between the markers.
@@ -11,7 +15,9 @@ const SYNC_BODY_MARKER = "JURISSYNCv1:";
 const SYNC_BODY_END = ":ENDJURISSYNC";
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 
-export type SyncAction = "publicar" | "tornar-privado" | "editar";
+// "sync-doc" carries one full document externo→interno (full overwrite, STATE=público).
+// "sync-request" is an empty interno→externo signal asking externo to run its export.
+export type SyncAction = "publicar" | "tornar-privado" | "editar" | "sync-doc" | "sync-request";
 
 interface SyncPayload {
     action: SyncAction;
@@ -186,6 +192,24 @@ async function applyAction(action: SyncAction, uuid: string, content?: Record<st
         return true;
     }
 
+    // sync-doc (externo→interno): externo is the source of truth, so replace the
+    // whole document (or create it), always público. No merge.
+    if (action === "sync-doc") {
+        if (!content) {
+            console.warn(`[email-sync-back] sync-doc for UUID ${uuid} has no content, skipping`);
+            return false;
+        }
+        const doc = { ...content, STATE: "público" } as JurisprudenciaDocument;
+        if (docId) {
+            await client.index({ index: JurisprudenciaVersion, id: docId, document: doc });
+            console.log(`[email-sync-back] Overwrote UUID=${uuid} (id=${docId})`);
+        } else {
+            await client.index({ index: JurisprudenciaVersion, document: doc });
+            console.log(`[email-sync-back] Created UUID=${uuid}`);
+        }
+        return true;
+    }
+
     if (!docId) {
         console.warn(`[email-sync] Document with UUID ${uuid} not found in this deployment, skipping`);
         return false;
@@ -198,9 +222,12 @@ async function applyAction(action: SyncAction, uuid: string, content?: Record<st
         }
         await updateDoc(docId, content);
         console.log(`[email-sync] Applied editar to UUID=${uuid} (id=${docId})`);
-    } else {
+    } else if (action === "tornar-privado") {
         await updateDoc(docId, { STATE: "privado" });
         console.log(`[email-sync] Applied tornar-privado to UUID=${uuid} (id=${docId})`);
+    } else {
+        console.warn(`[email-sync] Unhandled action "${action}" for UUID ${uuid}`);
+        return false;
     }
     return true;
 }
@@ -300,6 +327,36 @@ export async function pollAndProcessSyncEmails(): Promise<{ processed: number; e
         if (subject.startsWith(SYNC_BACK_SUBJECT_PREFIX)) {
             continue;
         }
+
+        // Pull request from interno: verify it, then run the export in-process.
+        // "[JURIS-SYNC-REQUEST]" does not start with "[JURIS-SYNC]" (the bracket
+        // differs), so it must be handled explicitly before the bare-prefix check.
+        if (subject.startsWith(SYNC_REQUEST_SUBJECT_PREFIX)) {
+            if (trustedFrom && fromAddress.toLowerCase() !== trustedFrom.toLowerCase()) {
+                console.warn(`[email-sync] Ignoring sync-request from untrusted sender: ${fromAddress}`);
+                await markRead(msg.id);
+                continue;
+            }
+            const reqPayload = decodeSyncBody(msg.body?.content?.trim() || "");
+            if (!reqPayload || !verifySyncPayload(reqPayload) || reqPayload.action !== "sync-request") {
+                console.warn(`[email-sync] Invalid sync-request, ignoring: ${subject}`);
+                await markRead(msg.id);
+                errors++;
+                continue;
+            }
+            await markRead(msg.id);
+            try {
+                console.log("[email-sync] Received sync-request from interno — running export");
+                const r = await sendBulkSyncEmails();
+                console.log(`[email-sync] sync-request export: sent ${r.sent} document email(s)`);
+                processed++;
+            } catch (err) {
+                console.error("[email-sync] sync-request export failed:", err);
+                errors++;
+            }
+            continue;
+        }
+
         if (!subject.startsWith(SYNC_SUBJECT_PREFIX)) {
             // Not a sync email — leave unread for the mailbox owner
             continue;
@@ -355,98 +412,26 @@ export async function pollAndProcessSyncEmails(): Promise<{ processed: number; e
 // ============================================================================
 // Sync-back: externo → interno. Externo is the source of truth during the
 // testing phase — it exports every document changed since the last export
-// (tracked by _seq_no) in batched emails, and interno fully overwrites its
-// copies on import. No conflict detection by design.
+// (tracked by _seq_no) as ONE email per document, and interno fully overwrites
+// its copy on import. No conflict detection by design. Reuses the single-doc
+// SyncPayload machinery (buildSyncPayload / decodeSyncBody / verifySyncPayload /
+// applyAction) with action "sync-doc".
 // ============================================================================
 
 const SYNC_BACK_SUBJECT_PREFIX = "[JURIS-SYNC-BACK]";
 const SYNC_META_INDEX = "juris-sync-meta";
 const SYNC_META_DOC_ID = "sync-state";
-// Graph API rejects requests around ~4MB; leave room for base64 (+33%) and envelope.
-const SYNC_BACK_MAX_BATCH_JSON_BYTES = 2_500_000;
-const SYNC_BACK_MAX_BATCH_DOCS = 100;
+// Email carries incremental deltas only. If more than this many documents changed
+// since the last export (e.g. the bookmark was never set, so the whole corpus
+// qualifies), refuse rather than flood the mailbox — that load goes via an ES
+// snapshot instead.
+const SYNC_BACK_MAX_DELTA = 1000;
 
-interface SyncBackPayload {
-    action: "bulk-sync";
-    batchIndex: number;
-    ts: number;
-    documents: Record<string, any>[];
-    sig: string;
-}
-
-// While interno is applying an imported batch, outbound sync emails are
+// While interno is applying imported documents, outbound sync emails are
 // suppressed so the overwrite can't echo back to externo.
 let syncImporting = false;
 export function isSyncImporting(): boolean {
     return syncImporting;
-}
-
-function computeSyncBackSig(secret: string, batchIndex: number, ts: number, documents: Record<string, any>[]): string {
-    const documentsHash = crypto.createHash("sha256").update(JSON.stringify(documents)).digest("hex");
-    const data = JSON.stringify({ action: "bulk-sync", batchIndex, ts, documentsHash });
-    return crypto.createHmac("sha256", secret).update(data).digest("hex");
-}
-
-function buildSyncBackPayload(batchIndex: number, documents: Record<string, any>[]): SyncBackPayload {
-    const secret = process.env.SYNC_SECRET;
-    if (!secret) throw new Error("SYNC_SECRET not configured");
-    const ts = Date.now();
-    const sig = computeSyncBackSig(secret, batchIndex, ts, documents);
-    return { action: "bulk-sync", batchIndex, ts, documents, sig };
-}
-
-function verifySyncBackPayload(payload: SyncBackPayload): boolean {
-    const secret = process.env.SYNC_SECRET;
-    if (!secret) {
-        console.error("[email-sync-back] SYNC_SECRET not configured, cannot verify payload");
-        return false;
-    }
-    if (Date.now() - payload.ts > 86_400_000) {
-        console.warn("[email-sync-back] Payload expired (>24h old)");
-        return false;
-    }
-    const expected = computeSyncBackSig(secret, payload.batchIndex, payload.ts, payload.documents);
-    try {
-        return crypto.timingSafeEqual(Buffer.from(payload.sig, "hex"), Buffer.from(expected, "hex"));
-    } catch {
-        return false;
-    }
-}
-
-function decodeSyncBackBody(rawBody: string): SyncBackPayload | null {
-    if (!rawBody) return null;
-    const text = rawBody.replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/gi, " ");
-
-    const tryParse = (s: string): SyncBackPayload | null => {
-        try {
-            const p = JSON.parse(s);
-            return p && p.action === "bulk-sync" && Array.isArray(p.documents) && p.sig ? (p as SyncBackPayload) : null;
-        } catch {
-            return null;
-        }
-    };
-    const fromBase64 = (b64: string): SyncBackPayload | null => {
-        try {
-            return tryParse(Buffer.from(b64.replace(/[^A-Za-z0-9+/=]/g, ""), "base64").toString("utf-8"));
-        } catch {
-            return null;
-        }
-    };
-
-    const s = text.indexOf(SYNC_BODY_MARKER);
-    const e = s !== -1 ? text.indexOf(SYNC_BODY_END, s + 1) : -1;
-    if (s !== -1 && e !== -1) {
-        const p = fromBase64(text.slice(s + SYNC_BODY_MARKER.length, e));
-        if (p) return p;
-    }
-    const runs = text.match(/[A-Za-z0-9+/=]{40,}/g);
-    if (runs) {
-        for (const run of runs.sort((a, b) => b.length - a.length)) {
-            const p = fromBase64(run);
-            if (p) return p;
-        }
-    }
-    return null;
 }
 
 // --- Sync state (last exported _seq_no) ---
@@ -470,19 +455,16 @@ export async function writeLastSyncSeqNo(seqNo: number): Promise<void> {
     });
 }
 
-// --- Externo: export ---
+// --- Shared mailer: one signed SyncPayload per email, with Graph 429 backoff ---
 
-async function sendSyncBackEmail(batchIndex: number, documents: Record<string, any>[]): Promise<void> {
+async function sendSignedMail(subject: string, payload: SyncPayload): Promise<void> {
     const config = getMsConfig();
     const to = process.env.SYNC_MS_RECIPIENT || config.mailbox;
     const token = await getGraphToken(config.tenantId, config.clientId, config.clientSecret);
-    const payload = buildSyncBackPayload(batchIndex, documents);
-
-    const payloadJson = JSON.stringify(payload);
-    const emailBody = `${SYNC_BODY_MARKER}${Buffer.from(payloadJson, "utf-8").toString("base64")}${SYNC_BODY_END}`;
+    const emailBody = `${SYNC_BODY_MARKER}${Buffer.from(JSON.stringify(payload), "utf-8").toString("base64")}${SYNC_BODY_END}`;
     const requestBody = JSON.stringify({
         message: {
-            subject: `${SYNC_BACK_SUBJECT_PREFIX} batch ${batchIndex + 1} (${documents.length} docs)`,
+            subject,
             body: { contentType: "Text", content: emailBody },
             toRecipients: [{ emailAddress: { address: to } }],
         },
@@ -495,66 +477,67 @@ async function sendSyncBackEmail(batchIndex: number, documents: Record<string, a
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const resp = await fetch(`${GRAPH_BASE}/users/${encodeURIComponent(config.mailbox)}/sendMail`, {
             method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: requestBody,
         });
-
-        if (resp.ok) {
-            console.log(`[email-sync-back] Sent batch ${batchIndex + 1} with ${documents.length} documents`);
-            return;
-        }
-
+        if (resp.ok) return;
         if (resp.status === 429 && attempt < maxAttempts) {
             const retryAfter = parseInt(resp.headers.get("Retry-After") || "", 10);
             const waitMs = Math.min(Number.isFinite(retryAfter) ? retryAfter * 1000 : attempt * 30_000, 120_000);
-            console.warn(`[email-sync-back] Throttled on batch ${batchIndex + 1} (attempt ${attempt}/${maxAttempts}), waiting ${Math.round(waitMs / 1000)}s`);
+            console.warn(`[email-sync-back] Throttled on "${subject}" (attempt ${attempt}/${maxAttempts}), waiting ${Math.round(waitMs / 1000)}s`);
             await new Promise(r => setTimeout(r, waitMs));
             continue;
         }
-
-        throw new Error(`MS Graph sendMail failed for sync-back batch ${batchIndex + 1} (${resp.status}): ${await resp.text()}`);
+        throw new Error(`MS Graph sendMail failed for "${subject}" (${resp.status}): ${await resp.text()}`);
     }
 }
 
-export async function sendBulkSyncEmails(): Promise<{ sent: number; documents: number; maxSeqNo: number }> {
+// --- Interno: pull request (asks externo to run its export) ---
+
+export async function sendSyncRequestEmail(): Promise<void> {
+    const payload = buildSyncPayload("sync-request", SYNC_REQUEST_UUID);
+    await sendSignedMail(SYNC_REQUEST_SUBJECT_PREFIX, payload);
+    console.log("[email-sync] Sent sync-request to externo");
+}
+
+// --- Externo: export (one email per changed document) ---
+
+async function sendSyncBackDocEmail(uuid: string, fullDoc: Record<string, any>): Promise<void> {
+    const payload = buildSyncPayload("sync-doc", uuid, fullDoc);
+    await sendSignedMail(`${SYNC_BACK_SUBJECT_PREFIX} ${uuid}`, payload);
+}
+
+export async function sendBulkSyncEmails(): Promise<{ sent: number; refused?: boolean; message?: string; maxSeqNo: number }> {
     const client = await getElasticSearchClient();
     const lastSeqNo = await readLastSyncSeqNo();
-    console.log(`[email-sync-back] Export starting — documents with _seq_no > ${lastSeqNo}`);
 
-    // Stream: fill one batch, send it, drop it. Only a single batch is ever held
-    // in memory, so a full-index export (tens of thousands of docs) cannot OOM
-    // the process. The bookmark is advanced after each successful send, so a
-    // failure part-way through resumes from the last sent batch rather than
-    // re-sending everything.
-    let current: Record<string, any>[] = [];
-    let currentBytes = 0;
-    let batchSeqNo = lastSeqNo;   // highest _seq_no included in `current`
-    let sentSeqNo = lastSeqNo;    // highest _seq_no already committed to the bookmark
+    // Refuse a runaway delta rather than emailing the whole corpus.
+    const countResp: any = await client.count({
+        index: JurisprudenciaVersion,
+        query: { range: { _seq_no: { gt: lastSeqNo } } },
+    });
+    const pending = countResp.count ?? 0;
+    if (pending > SYNC_BACK_MAX_DELTA) {
+        const message = `delta too large (${pending} docs > ${SYNC_BACK_MAX_DELTA}); re-seed interno via ES snapshot instead of email`;
+        console.warn(`[email-sync-back] Export refused: ${message}`);
+        return { sent: 0, refused: true, message, maxSeqNo: lastSeqNo };
+    }
+
+    console.log(`[email-sync-back] Export starting — ${pending} document(s) with _seq_no > ${lastSeqNo}`);
     let sent = 0;
-    let totalDocs = 0;
+    let sentSeqNo = lastSeqNo;
     let searchAfter: any[] | undefined = undefined;
 
-    const flush = async () => {
-        if (current.length === 0) return;
-        await sendSyncBackEmail(sent, current);
-        sent++;
-        totalDocs += current.length;
-        sentSeqNo = batchSeqNo;
-        await writeLastSyncSeqNo(sentSeqNo);
-        current = [];
-        currentBytes = 0;
-    };
-
+    // Fixed range on the original bookmark; pagination is driven by search_after.
+    // The bookmark is advanced per document, so a failure part-way through resumes
+    // from the last document actually sent.
     for (;;) {
         const page: any = await client.search({
             index: JurisprudenciaVersion,
-            query: { range: { _seq_no: { gt: sentSeqNo } } },
+            query: { range: { _seq_no: { gt: lastSeqNo } } },
             sort: [{ _seq_no: "asc" }],
             seq_no_primary_term: true,
-            size: 200,
+            size: 100,
             ...(searchAfter ? { search_after: searchAfter } : {}),
         });
         const hits = page.hits.hits;
@@ -562,53 +545,30 @@ export async function sendBulkSyncEmails(): Promise<{ sent: number; documents: n
 
         for (const hit of hits) {
             if (!hit._source) continue;
-            const docBytes = JSON.stringify(hit._source).length;
-            if (current.length > 0 && (currentBytes + docBytes > SYNC_BACK_MAX_BATCH_JSON_BYTES || current.length >= SYNC_BACK_MAX_BATCH_DOCS)) {
-                await flush();
+            const uuid = hit._source.UUID;
+            if (!uuid) {
+                console.warn(`[email-sync-back] Doc id=${hit._id} has no UUID, skipping`);
+                continue;
             }
-            current.push(hit._source);
-            currentBytes += docBytes;
-            if (typeof hit._seq_no === "number" && hit._seq_no > batchSeqNo) batchSeqNo = hit._seq_no;
+            await sendSyncBackDocEmail(uuid, hit._source);
+            sent++;
+            if (typeof hit._seq_no === "number") {
+                sentSeqNo = hit._seq_no;
+                await writeLastSyncSeqNo(sentSeqNo);
+            }
         }
         searchAfter = hits[hits.length - 1].sort;
     }
-    await flush();
 
-    if (sent === 0) {
-        console.log("[email-sync-back] Nothing to export");
-    } else {
-        console.log(`[email-sync-back] Export complete: ${sent} emails, ${totalDocs} documents, maxSeqNo=${sentSeqNo}`);
-    }
-    return { sent, documents: totalDocs, maxSeqNo: sentSeqNo };
+    console.log(sent === 0
+        ? "[email-sync-back] Nothing to export"
+        : `[email-sync-back] Export complete: ${sent} document email(s), maxSeqNo=${sentSeqNo}`);
+    return { sent, maxSeqNo: sentSeqNo };
 }
 
-// --- Interno: import ---
+// --- Interno: import (one document per email) ---
 
-async function applyBulkSync(documents: Record<string, any>[]): Promise<{ upserted: number; created: number }> {
-    const client = await getElasticSearchClient();
-    let upserted = 0;
-    let created = 0;
-    for (const doc of documents) {
-        const uuid = doc.UUID;
-        if (!uuid) {
-            console.warn("[email-sync-back] Document without UUID in batch, skipping");
-            continue;
-        }
-        // Externo is the source of truth: full overwrite, always público.
-        const finalDoc = { ...doc, STATE: "público" };
-        const existingId = await findDocIdByUUID(uuid);
-        if (existingId) {
-            await client.index({ index: JurisprudenciaVersion, id: existingId, document: finalDoc });
-            upserted++;
-        } else {
-            await client.index({ index: JurisprudenciaVersion, document: finalDoc });
-            created++;
-        }
-    }
-    return { upserted, created };
-}
-
-export async function pollAndProcessBackSyncEmails(): Promise<{ processed: number; documents: number; errors: number }> {
+export async function pollAndProcessBackSyncEmails(): Promise<{ processed: number; errors: number }> {
     const config = getMsConfig();
     const trustedFrom = process.env.SYNC_MS_TRUSTED_FROM || config.mailbox;
     const token = await getGraphToken(config.tenantId, config.clientId, config.clientSecret);
@@ -630,7 +590,6 @@ export async function pollAndProcessBackSyncEmails(): Promise<{ processed: numbe
     const { value: messages } = await resp.json();
 
     let processed = 0;
-    let documents = 0;
     let errors = 0;
 
     const markRead = (msgId: string) =>
@@ -654,15 +613,14 @@ export async function pollAndProcessBackSyncEmails(): Promise<{ processed: numbe
                 continue;
             }
 
-            const body: string = msg.body?.content?.trim() || "";
-            const payload = body ? decodeSyncBackBody(body) : null;
-            if (!payload) {
-                console.warn(`[email-sync-back] Could not parse payload for "${subject}", skipping`);
+            const payload = decodeSyncBody(msg.body?.content?.trim() || "");
+            if (!payload || payload.action !== "sync-doc") {
+                console.warn(`[email-sync-back] Could not parse sync-doc payload for "${subject}", skipping`);
                 await markRead(msg.id);
                 continue;
             }
 
-            if (!verifySyncBackPayload(payload)) {
+            if (!verifySyncPayload(payload)) {
                 console.warn(`[email-sync-back] Invalid or expired signature for subject: ${subject}`);
                 await markRead(msg.id);
                 errors++;
@@ -670,12 +628,10 @@ export async function pollAndProcessBackSyncEmails(): Promise<{ processed: numbe
             }
 
             try {
-                const { upserted, created } = await applyBulkSync(payload.documents);
-                console.log(`[email-sync-back] Applied batch ${payload.batchIndex + 1}: ${upserted} overwritten, ${created} created`);
-                processed++;
-                documents += payload.documents.length;
+                const ok = await applyAction("sync-doc", payload.uuid, payload.content);
+                if (ok) processed++; else errors++;
             } catch (err) {
-                console.error(`[email-sync-back] Failed to apply batch ${payload.batchIndex + 1}:`, err);
+                console.error(`[email-sync-back] Failed to apply sync-doc for UUID ${payload.uuid}:`, err);
                 errors++;
             }
 
@@ -686,7 +642,7 @@ export async function pollAndProcessBackSyncEmails(): Promise<{ processed: numbe
     }
 
     if (processed > 0 || errors > 0) {
-        console.log(`[email-sync-back] Poll complete: ${processed} batches, ${documents} documents, ${errors} errors`);
+        console.log(`[email-sync-back] Poll complete: ${processed} applied, ${errors} errors`);
     }
-    return { processed, documents, errors };
+    return { processed, errors };
 }

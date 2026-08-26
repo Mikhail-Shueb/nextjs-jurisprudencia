@@ -2,7 +2,7 @@ import LoggerApi from "@/core/logger-api";
 import { pollAndProcessBackSyncEmails } from "@/core/email-sync";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-type Response = { ok: boolean; processed?: number; documents?: number; errors?: number; message?: string };
+type Response = { ok: boolean; processed?: number; errors?: number; message?: string };
 
 /**
  * POST /api/gestao/sync-import
@@ -26,8 +26,8 @@ export default LoggerApi(async function syncImportHandler(
     }
 
     try {
-        const { processed, documents, errors } = await pollAndProcessBackSyncEmails();
-        return res.status(200).json({ ok: true, processed, documents, errors });
+        const { processed, errors } = await pollAndProcessBackSyncEmails();
+        return res.status(200).json({ ok: true, processed, errors });
     } catch (err: any) {
         console.error("Error in /api/gestao/sync-import:", err);
         return res.status(500).json({ ok: false, message: err?.message || "Internal server error" });
