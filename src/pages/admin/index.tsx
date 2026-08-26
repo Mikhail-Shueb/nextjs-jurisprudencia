@@ -47,11 +47,13 @@ export default function IndexPage({ role, syncRole }: IndexPageProps) {
                             title="Pedir sincronização"
                             description="Pedir ao juris externo as últimas alterações (o externo sobrepõe os dados locais). As alterações chegam dentro de ~1 min."
                             endpoint="/api/gestao/sync-request"
+                            icon="bi-arrow-repeat"
                         />}
                         {can('manageUsers') && syncRole === "externo" && <SyncTrigger
                             title="Exportar para Interno"
                             description="Enviar por email todos os documentos alterados desde a última exportação."
                             endpoint="/api/gestao/sync-export"
+                            icon="bi-box-arrow-up"
                         />}
                     </div>
                 </div>
@@ -69,10 +71,10 @@ function LinkEntry({ title, link, children }: { title: string, link: string, chi
     </div>
 }
 
-function SyncTrigger({ title, description, endpoint }: { title: string, description: string, endpoint: string }) {
+function SyncTrigger({ title, description, endpoint, icon }: { title: string, description: string, endpoint: string, icon: string }) {
     const router = useRouter();
     const [running, setRunning] = useState(false);
-    const [result, setResult] = useState<string | null>(null);
+    const [result, setResult] = useState<{ variant: "success" | "warning" | "danger", text: string } | null>(null);
 
     const trigger = async () => {
         setRunning(true);
@@ -80,13 +82,19 @@ function SyncTrigger({ title, description, endpoint }: { title: string, descript
         try {
             const res = await fetch(`${router.basePath}${endpoint}`, { method: "POST" });
             const data = await res.json();
-            if (data.ok) {
-                setResult(`Concluído: ${JSON.stringify(data)}`);
+            if (!data.ok) {
+                setResult({ variant: "danger", text: data.message || `Erro ${res.status}` });
+            } else if (data.refused) {
+                setResult({ variant: "warning", text: data.message || "Sincronização recusada." });
             } else {
-                setResult(`Erro: ${data.message || res.status}`);
+                const text = data.message
+                    || (typeof data.sent === "number" ? `${data.sent} documento(s) enviado(s).`
+                        : typeof data.processed === "number" ? `${data.processed} documento(s) aplicado(s).`
+                            : "Concluído.");
+                setResult({ variant: "success", text });
             }
         } catch (err: any) {
-            setResult(`Erro: ${err?.message || "falha de rede"}`);
+            setResult({ variant: "danger", text: err?.message || "Falha de rede." });
         } finally {
             setRunning(false);
         }
@@ -96,10 +104,12 @@ function SyncTrigger({ title, description, endpoint }: { title: string, descript
         <div className="card-body">
             <div className="card-title">{title}</div>
             <p>{description}</p>
-            <button className="btn btn-primary btn-sm" onClick={trigger} disabled={running}>
-                {running ? "A executar..." : title}
+            <button className="btn btn-primary" onClick={trigger} disabled={running}>
+                {running
+                    ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>A processar…</>
+                    : <><i className={`bi ${icon} me-2`}></i>{title}</>}
             </button>
-            {result && <div className="mt-2 small text-muted">{result}</div>}
+            {result && <div className={`alert alert-${result.variant} mt-3 mb-0 py-2`} role="alert">{result.text}</div>}
         </div>
     </div>
 }
