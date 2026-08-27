@@ -1,4 +1,4 @@
-import GenericPage from "@/components/genericPageStructure"
+import GenericPage from "@/components/main_pages/genericPageStructure"
 import { SmallSpinner } from "@/components/loading"
 import { getElasticSearchClient } from "@/core/elasticsearch"
 import { LoggerServerSideProps } from "@/core/logger-api"
@@ -13,8 +13,7 @@ interface BoletimProps {
     maxYear: number
 }
 
-export const getServerSideProps: GetServerSideProps<BoletimProps> = async (ctx) => {
-    LoggerServerSideProps(ctx)
+export const getServerSideProps: GetServerSideProps<BoletimProps> = LoggerServerSideProps(async (ctx) => {
     const client = await getElasticSearchClient()
     const result = await client.search({
         index: JurisprudenciaVersion,
@@ -42,7 +41,7 @@ export const getServerSideProps: GetServerSideProps<BoletimProps> = async (ctx) 
     const maxYear = parseInt((result.aggregations?.maxYear as any)?.value_as_string || new Date().getFullYear().toString()) || new Date().getFullYear()
 
     return { props: { areas, minYear, maxYear } }
-}
+})
 
 const MONTHS = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
