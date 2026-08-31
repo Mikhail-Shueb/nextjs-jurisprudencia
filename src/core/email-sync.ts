@@ -27,6 +27,18 @@ interface SyncPayload {
     sig: string;
 }
 
+// Fields holding the ORIGINAL, non-anonimized text. These must never reach the
+// público (externo) deployment — not over the shared mailbox, not into externo's
+// index. Same set the public document page already gates behind authentication.
+const NON_ANON_FIELDS = ["Texto Não Anonimizado", "Sumário Não Anonimizado"] as const;
+
+// Return a shallow copy of the content with the non-anonimized fields removed.
+function stripNonAnon<T extends Record<string, any>>(content: T): T {
+    const clone: Record<string, any> = { ...content };
+    for (const field of NON_ANON_FIELDS) delete clone[field];
+    return clone as T;
+}
+
 // --- Signature helpers ---
 
 function computeSig(secret: string, action: SyncAction, uuid: string, ts: number, content?: Record<string, any>): string {
@@ -114,7 +126,10 @@ async function sendSyncEmailInternal(action: SyncAction, uuid: string, content?:
     const config = getMsConfig();
     const to = process.env.SYNC_MS_RECIPIENT || config.mailbox;
     const token = await getGraphToken(config.tenantId, config.clientId, config.clientSecret);
-    const payload = buildSyncPayload(action, uuid, content);
+    // interno→externo: the público deployment must never receive the non-anonimized
+    // text, so strip it before it ever enters the (shared) mailbox.
+    const safeContent = content ? stripNonAnon(content) : content;
+    const payload = buildSyncPayload(action, uuid, safeContent);
 
     const payloadJson = JSON.stringify(payload);
     const emailBody = `${SYNC_BODY_MARKER}${Buffer.from(payloadJson, "utf-8").toString("base64")}${SYNC_BODY_END}`;
@@ -175,6 +190,13 @@ async function findDocIdByUUID(uuid: string): Promise<string | null> {
 async function applyAction(action: SyncAction, uuid: string, content?: Record<string, any>): Promise<boolean> {
     const client = await getElasticSearchClient();
     const docId = await findDocIdByUUID(uuid);
+
+    // Defense in depth: an interno→externo action must never write the non-anonimized
+    // text into the público index, even if an out-of-date interno still sends it.
+    // sync-doc is externo→interno, where interno legitimately holds its own text.
+    if (content && action !== "sync-doc") {
+        content = stripNonAnon(content);
+    }
 
     if (action === "publicar") {
         if (!docId) {
