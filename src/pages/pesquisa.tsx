@@ -75,9 +75,9 @@ function ShowResults({results, searchParams, searchInfo}: {results: SearchHandle
             </SelectNavigate>
         </div>
         {auth ? (
-            <JurisprudenciaTable results={results} searchId={searchInfo.searchId} />
+            <JurisprudenciaTable results={results} searchId={searchInfo.searchId ?? undefined} />
         ) : (
-            results.map((h, i) => <JurisprudenciaItem key={i} hit={h} searchId={searchInfo.searchId}/>)
+            results.map((h, i) => <JurisprudenciaItem key={i} hit={h} searchId={searchInfo.searchId ?? undefined}/>)
         )}
         <article className="row d-print-none">
             <nav>

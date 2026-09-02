@@ -6,9 +6,6 @@ import { ReactNode, useState } from "react";
 import { useRouter } from "next/router";
 import { LoggerServerSideProps } from "@/core/logger-api";
 import GenericPage from "@/components/main_pages/genericPageStructure";
-import { useFetch } from "@/components/useFetch";
-import { Loading } from "@/components/loading";
-import { AdminOverviewResponse } from "../api/admin/overview";
 
 interface IndexPageProps {
     role: Role;
@@ -22,8 +19,6 @@ export const getServerSideProps = LoggerServerSideProps(withAuthentication<Index
 
 export default function IndexPage({ role, syncRole }: IndexPageProps) {
     const can = (feature: Feature) => roleCanAccess(role, feature);
-    const data = useFetch<AdminOverviewResponse>("/api/admin/overview", []);
-    const [activeTab, setActiveTab] = useState<"overview" | "metrics" | "logs" | "quality">("overview");
 
     return <GenericPage title="Jurisprudência STJ - Administração">
         <div className="row justify-content-sm-center">
@@ -62,6 +57,10 @@ export default function IndexPage({ role, syncRole }: IndexPageProps) {
                         />}
                     </div>
                 </div>
+            </div>
+        </div>
+    </GenericPage>;
+}
 
 function LinkEntry({ title, link, children }: { title: string, link: string, children: ReactNode }) {
     return <div className="card m-1">
