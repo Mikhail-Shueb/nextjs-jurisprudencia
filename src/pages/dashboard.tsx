@@ -49,6 +49,9 @@ export default function UserDashboard(props: FormProps) {
             <Link href="/pesquisa" className="stj-btn-primary">
               <i className="bi bi-search"></i> Pesquisa Avançada
             </Link>
+            <Link href="/boletim" className="stj-btn-outline">
+              <i className="bi bi-newspaper"></i> Boletim Mensal
+            </Link>
             <Link href="/indices" className="stj-btn-outline">
               <i className="bi bi-table"></i> Matriz de Índices
             </Link>
@@ -86,6 +89,9 @@ export default function UserDashboard(props: FormProps) {
             </Link>
             <Link href='/pesquisa?Votação="Unanimidade"' className="stj-tag-chip">
               <i className="bi bi-check2-circle me-1 text-warning"></i> Votação Unânime
+            </Link>
+            <Link href="/boletim" className="stj-tag-chip">
+              <i className="bi bi-file-earmark-pdf me-1 text-danger"></i> Gerar Boletim
             </Link>
             <Link href="/pesquisa?sort=des" className="stj-tag-chip">
               <i className="bi bi-clock-history me-1"></i> Mais Recentes
