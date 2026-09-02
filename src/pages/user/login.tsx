@@ -2,6 +2,7 @@ import GenericPage from "@/components/main_pages/genericPageStructure";
 import { LoggerServerSideProps } from "@/core/logger-api";
 import { authenticate, AuthenticateResponse } from "@/core/user/authenticate";
 import { createSession, validateSession } from "@/core/user/session";
+import { logAuditEvent } from "@/core/audit-log";
 import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { useState } from "react";
@@ -39,15 +40,10 @@ export const getServerSideProps: GetServerSideProps<LoginProps> = LoggerServerSi
 
         if (r === AuthenticateResponse.AUTHORIZED) {
             let session = await createSession(user!);
-            const isSecure = process.env.NODE_ENV === "production" && !ctx.req.headers.host?.includes("localhost");
-            const secureFlag = isSecure ? "; Secure" : "";
-            ctx.res.setHeader("Set-Cookie", [
-                `user=${encodeURIComponent(user!)}; HttpOnly${secureFlag}; SameSite=Lax; Path=/`,
-                `session=${encodeURIComponent(session)}; HttpOnly${secureFlag}; SameSite=Lax; Path=/`
-            ]);
-            return { redirect: { destination: redirect, statusCode: 303 } };
-        } else {
-            return { props: { response: r || AuthenticateResponse.INVALID_USER } };
+            ctx.res.setHeader("Set-cookie", [`user=${user}; HttpOnly; Path=/`,`session=${session}; HttpOnly; Path=/`])
+            const ip = (ctx.req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || ctx.req.socket?.remoteAddress || "unknown";
+            logAuditEvent("login", user!, { ip });
+            return {redirect: {destination: redirect, statusCode: 303}}
         }
     } else {
         let user = ctx.req.cookies["user"];

@@ -6,6 +6,20 @@ import { AggregationsAggregationContainer, AggregationsStringTermsAggregate } fr
 import { JurisprudenciaVersion } from '@stjiris/jurisprudencia-document';
 import type { NextApiRequest, NextApiResponse } from 'next'
 
+// ES terms-agg `include` uses Lucene's RegExp, which does NOT support the (?i)
+// inline flag (it matches literally and returns nothing). The aggregation runs on
+// the case-preserving `.raw` field, so to get a case-insensitive "contains" match
+// we expand each ASCII letter into a [aA] class and escape Lucene regexp
+// metacharacters on everything else.
+function caseInsensitiveContains(prefix: string): string {
+    const expanded = Array.from(prefix).map(ch => {
+        if (/[a-zA-Z]/.test(ch)) return `[${ch.toLowerCase()}${ch.toUpperCase()}]`;
+        if (/[.?+*|{}[\]()"\\#@&<>~]/.test(ch)) return `\\${ch}`;
+        return ch;
+    }).join("");
+    return `.*${expanded}.*`;
+}
+
 export default LoggerApi(async function datalistHandler(
     req: NextApiRequest,
     res: NextApiResponse<DatalistObj[]>
@@ -31,7 +45,7 @@ export default LoggerApi(async function datalistHandler(
             order: {
                 _key: "asc"
             },
-            ...(prefix ? { include: `(?i).*${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*` } : {})
+            ...(prefix ? { include: caseInsensitiveContains(prefix) } : {})
         }
     }
     const sfilters = { pre: [], after: [] } as SearchFilters;

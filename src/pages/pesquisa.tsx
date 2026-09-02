@@ -10,6 +10,8 @@ import Link from "next/link"
 import { ReadonlyURLSearchParams, useSearchParams } from "next/navigation"
 import { modifySearchParams, SelectNavigate } from "@/components/main_pages/SelectNavigate"
 import JurisprudenciaItem from "@/components/main_pages/search/JurisprudenciaItem"
+import JurisprudenciaTable from "@/components/main_pages/search/JurisprudenciaTable"
+import { useAuth } from "@/contexts/auth"
 
 interface PesquisaProps extends FormProps {
     searchedArray: string[]
@@ -47,52 +49,37 @@ export default function Pesquisa(props: PesquisaProps) {
     </GenericPageWithForm>
 }
 
-function ShowResults({ results, searchParams, searchInfo }: { results: SearchHandlerResponse, searchParams: ReadonlyURLSearchParams, searchInfo: PesquisaProps }) {
-    const sort = searchParams.get("sort") || "des";
-    const rpp = searchParams.get("rpp") || `${searchInfo.rpp || 10}`;
-    const page = parseInt(searchParams.get("page") || "0");
+function ShowResults({results, searchParams, searchInfo}: {results: SearchHandlerResponse, searchParams: ReadonlyURLSearchParams, searchInfo: PesquisaProps}){
+    const auth = useAuth();
 
-    function onClickShare(e: React.MouseEvent<HTMLElement>) {
-        const id = e.currentTarget.getAttribute("data-id");
-        if (id && typeof window !== "undefined" && navigator.clipboard) {
-            const url = `${window.location.origin}/pesquisa?search=${id}`;
-            navigator.clipboard.writeText(url);
-            alert("Endereço da pesquisa copiado para a área de transferência!");
-        }
-    }
+    const sort = searchParams.get("sort") || "des"
+    let page = parseInt(searchParams.get("page") || "0")
+    const rpp = parseInt(searchParams.get("rpp") || "10")
 
     return <>
-        <article className="d-flex align-items-center flex-wrap gap-2 mb-2">
-            <div>
-                <b className="d-none d-print-inline">Ordenação:</b>
-                <b><SelectNavigate name="sort" className="me-2" defaultValue={sort} valueToHref={(v, params) => `/pesquisa?${modifySearchParams(params, "sort", v)}`}>
-                    <option value="score">Relevância</option>
-                    <option value="asc">Data Ascendente</option>
-                    <option value="des">Data Descendente</option>
-                </SelectNavigate></b>
-            </div>
-            <div>
-                <b className="d-none d-print-inline">Resultados por página:</b>
-                <b><SelectNavigate name="rpp" className="me-2" defaultValue={rpp} valueToHref={(v, params) => {
-                    const newParams = modifySearchParams(params, "rpp", v);
-                    newParams.delete("page");
-                    return `/pesquisa?${newParams.toString()}`;
-                }}>
-                    <option value="10">10 resultados</option>
-                    <option value="20">20 resultados</option>
-                    <option value="50">50 resultados</option>
-                    <option value="100">100 resultados</option>
-                </SelectNavigate></b>
-            </div>
-            {searchInfo.searchId ? <i className="bi bi-share ms-2" title="Partilhar" role="button" onClick={onClickShare} data-id={searchInfo.searchId}></i> : ""}
-            <div className="ms-auto d-print-none">
-                {searchInfo.searchedArray.length > 0 ?
-                    ["Termos da pesquisa destacados: ", searchInfo.searchedArray.map((s, i) => <span key={i} className="badge bg-white text-dark mx-1" style={{ border: `2px solid var(--highlight-${i % 5}, var(--primary-gold))` }}>{s}</span>)]
-                    : ""}
-            </div>
-        </article>
-        {...results.map((h, i) => <JurisprudenciaItem key={i} hit={h} searchId={searchInfo.searchId || undefined} />)}
-        <article className="row d-print-none mt-3">
+        <div className="mb-2 d-flex align-items-center gap-2">
+            <SelectNavigate name="rpp-select" className="me-1" defaultValue={rpp} valueToHref={(v, params) => {
+                                                                                                    const newParams = modifySearchParams(params, "rpp", v);
+                                                                                                    return `/pesquisa?${modifySearchParams(newParams, "page", "0")}`;
+                                                                                                } }>
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+            </SelectNavigate>
+            <SelectNavigate name="sort" className="me-2" defaultValue={sort} valueToHref={(v, params) => `/pesquisa?${modifySearchParams(params, "sort", v)}` }>
+                <option value="score">Relevância</option>
+                <option value="asc">Data Ascendente</option>
+                <option value="des">Data Descendente</option>
+            </SelectNavigate>
+        </div>
+        {auth ? (
+            <JurisprudenciaTable results={results} searchId={searchInfo.searchId} />
+        ) : (
+            results.map((h, i) => <JurisprudenciaItem key={i} hit={h} searchId={searchInfo.searchId}/>)
+        )}
+        <article className="row d-print-none">
             <nav>
                 <ul className="pagination justify-content-center text-center">
                     <li className="page-item">
