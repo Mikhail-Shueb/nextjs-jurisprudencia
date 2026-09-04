@@ -70,11 +70,14 @@ export async function computeParamsHash(params: Record<string, string[]>): Promi
     }
 }
 
+export type SearchParamsInput = URLSearchParams | { toString(): string } | string;
+
 /**
- * Extract structured parameters from a URLSearchParams or query string.
+ * Extract structured parameters from a URLSearchParams, ReadonlyURLSearchParams, or query string.
  */
-export function parseSearchParamsToRecord(searchParams: URLSearchParams | string): Record<string, string[]> {
-    const sp = typeof searchParams === "string" ? new URLSearchParams(searchParams) : searchParams;
+export function parseSearchParamsToRecord(searchParams: SearchParamsInput): Record<string, string[]> {
+    const rawString = typeof searchParams === "string" ? searchParams : searchParams.toString();
+    const sp = new URLSearchParams(rawString);
     const record: Record<string, string[]> = {};
     
     for (const key of sp.keys()) {
@@ -160,12 +163,11 @@ export function getSavedSessions(): SearchSessionSave[] {
  */
 export async function saveSession(
     name: string | undefined,
-    searchParams: URLSearchParams | string,
+    searchParams: SearchParamsInput,
     pathname: string = "/pesquisa"
 ): Promise<SearchSessionSave> {
     const params = parseSearchParamsToRecord(searchParams);
-    const sp = typeof searchParams === "string" ? new URLSearchParams(searchParams) : searchParams;
-    const queryString = sp.toString();
+    const queryString = typeof searchParams === "string" ? searchParams : searchParams.toString();
     const hash = await computeParamsHash(params);
     const summary = buildParamsSummary(params);
 
@@ -253,13 +255,12 @@ export function getLastSession(): SearchSessionSave | null {
  * Autosave the last search parameters silently (e.g. on navigation / page unload).
  */
 export async function saveLastSession(
-    searchParams: URLSearchParams | string,
+    searchParams: SearchParamsInput,
     pathname: string = "/pesquisa"
 ): Promise<void> {
     if (typeof window === "undefined" || !window.localStorage) return;
     const params = parseSearchParamsToRecord(searchParams);
-    const sp = typeof searchParams === "string" ? new URLSearchParams(searchParams) : searchParams;
-    const queryString = sp.toString();
+    const queryString = typeof searchParams === "string" ? searchParams : searchParams.toString();
     
     // Don't save empty/trivial sessions as last session
     if (Object.keys(params).length === 0) return;

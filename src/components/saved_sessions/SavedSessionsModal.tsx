@@ -59,10 +59,10 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
 
     const handleSaveCurrent = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsSaving(true);
         try {
-            const currentSp = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : searchParams;
-            const newSave = await saveSession(customName, currentSp, window.location.pathname);
+            const currentSp = typeof window !== "undefined" ? window.location.search : (searchParams ? searchParams.toString() : "");
+            const currentPath = typeof window !== "undefined" ? window.location.pathname : "/pesquisa";
+            const newSave = await saveSession(customName, currentSp, currentPath);
             setCustomName("");
             setFeedbackMsg({ text: `Pesquisa "${newSave.name}" guardada com sucesso!`, type: "success" });
             await refreshData();
