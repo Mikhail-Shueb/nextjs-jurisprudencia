@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter as useNavRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useKeysFromContext } from "@/contexts/keys";
 import { FORM_KEY, SwapableFilterList } from "./SwapableFilterList";
+import { getSavedSessions, saveLastSession } from "@/core/session-saves";
 
 // Helper field names combined into MinDate/MaxDate on submit
 const DATE_HELPERS = new Set(["_MinDay", "_MinMonth", "_MinYear", "_MaxDay", "_MaxMonth", "_MaxYear"]);
@@ -91,6 +92,24 @@ export default function SearchForm({ count, filtersUsed }: { count: number; filt
     const maxDate = search.get("MaxDate") || "";
     const keys = useKeysFromContext();
 
+    const [savedSessionsCount, setSavedSessionsCount] = useState(0);
+
+    useEffect(() => {
+        const updateCount = () => {
+            setSavedSessionsCount(getSavedSessions().length);
+        };
+        updateCount();
+        window.addEventListener("storage", updateCount);
+        return () => window.removeEventListener("storage", updateCount);
+    }, []);
+
+    // Autosave last active session whenever query params exist
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.location.search.length > 1) {
+            saveLastSession(window.location.search, window.location.pathname);
+        }
+    }, [search]);
+
     const resetDatas = useCallback(() => {
         if (minDayRef.current)   { minDayRef.current.value   = ""; }
         if (minMonthRef.current) { minMonthRef.current.value = ""; minMonthRef.current.style.color = "var(--bs-secondary-color, #6c757d)"; }
@@ -160,6 +179,37 @@ export default function SearchForm({ count, filtersUsed }: { count: number; filt
                             <i className="bi bi-eraser-fill" /> Limpar
                         </Link>
                     )}
+                </div>
+
+                {/* Session Save & Load Quick Buttons */}
+                <div className="d-flex align-items-center justify-content-between gap-1 my-1">
+                    <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm py-0 px-2 d-flex align-items-center gap-1 flex-fill justify-content-center"
+                        style={{ fontSize: "0.76rem" }}
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal-saved-sessions"
+                        title="Guardar parâmetros atuais da pesquisa no browser (Save File com Hash SHA-256)"
+                    >
+                        <i className="bi bi-bookmark-plus-fill"></i>
+                        <span>Guardar</span>
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm py-0 px-2 d-flex align-items-center gap-1 flex-fill justify-content-center"
+                        style={{ fontSize: "0.76rem" }}
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal-saved-sessions"
+                        title="Ver e carregar pesquisas guardadas no navegador"
+                    >
+                        <i className="bi bi-folder2-open"></i>
+                        <span>Sessões</span>
+                        {savedSessionsCount > 0 && (
+                            <span className="badge bg-secondary ms-1" style={{ fontSize: "0.65rem" }}>
+                                {savedSessionsCount}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
                 <input key={q} type="search" name="q" defaultValue={q} className="form-control form-control-sm my-1" placeholder="Texto Livre" />

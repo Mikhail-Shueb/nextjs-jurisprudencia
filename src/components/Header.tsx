@@ -1,9 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import ModalSobre from "./Sobre";
-import { usePathname, useSearchParams } from "next/navigation"
-import logoname from '../../public/images/PT-logoLogo-STJ.png'
+import SavedSessionsModal from "./saved_sessions/SavedSessionsModal";
+import { usePathname, useSearchParams } from "next/navigation";
+import logoname from '../../public/images/PT-logoLogo-STJ.png';
 import { useAuth } from "@/contexts/auth";
+import { useEffect, useState } from "react";
+import { getSavedSessions } from "@/core/session-saves";
 
 const NAVEGACAO = ["Pesquisa", "Índices", "Boletim"]
 
@@ -21,6 +24,16 @@ export default function Header(props: { keys_to_remove: string[] }) {
         }
     }
 
+    const [savedCount, setSavedCount] = useState(0);
+
+    useEffect(() => {
+        const updateCount = () => {
+            setSavedCount(getSavedSessions().length);
+        };
+        updateCount();
+        window.addEventListener("storage", updateCount);
+        return () => window.removeEventListener("storage", updateCount);
+    }, []);
 
     return <>
         <header className="mb-1 py-2 align-items-center d-flex flex-wrap border-bottom">
@@ -58,6 +71,24 @@ export default function Header(props: { keys_to_remove: string[] }) {
                     </li>)}
                     <li>|</li>
                     <li className="nav-link py-1 px-2 mx-1">
+                        <button
+                            type="button"
+                            className="border-0 nav-link fs-6 bg-transparent d-inline-flex align-items-center gap-1 cursor-pointer"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-saved-sessions"
+                            title="Sessões e Pesquisas Guardadas (sem conta)"
+                        >
+                            <i className="bi bi-floppy2 text-primary"></i>
+                            <span>Sessões</span>
+                            {savedCount > 0 && (
+                                <span className="badge rounded-pill bg-primary ms-1" style={{ fontSize: "0.68rem" }}>
+                                    {savedCount}
+                                </span>
+                            )}
+                        </button>
+                    </li>
+                    <li>|</li>
+                    <li className="nav-link py-1 px-2 mx-1">
                         <Link
                             href="/dashboard"
                             className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center gap-1 ${
@@ -79,5 +110,6 @@ export default function Header(props: { keys_to_remove: string[] }) {
             </nav>
         </header>
         <ModalSobre />
+        <SavedSessionsModal />
     </>
 }
