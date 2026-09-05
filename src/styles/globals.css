@@ -5,6 +5,12 @@
 @import "resources/cinzel.css";
 
 
+:root {
+    /* Slightly darker than Bootstrap's default #dee2e6 grey borders/lines */
+    --bs-border-color: #c8ced4;
+    --bs-border-color-translucent: rgba(0, 0, 0, 0.20);
+}
+
 body {
     font: 13px/1.5 'Noto Sans Serif', sans-serif;
     color: var(--primary-black);
