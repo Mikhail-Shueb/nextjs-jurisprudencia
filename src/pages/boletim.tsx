@@ -11,36 +11,59 @@ interface BoletimProps {
     areas: string[]
     minYear: number
     maxYear: number
+    isOffline?: boolean
 }
 
+const DEFAULT_AREAS = [
+    "Área Cível",
+    "Área Criminal",
+    "Área Social",
+    "Contencioso"
+]
+
 export const getServerSideProps: GetServerSideProps<BoletimProps> = LoggerServerSideProps(async (ctx) => {
-    const client = await getElasticSearchClient()
-    const result = await client.search({
-        index: JurisprudenciaVersion,
-        size: 0,
-        aggs: {
-            areas: {
-                terms: {
-                    field: "Área.Index.keyword",
-                    size: 100,
-                    order: { _key: "asc" }
+    let areas = DEFAULT_AREAS
+    let minYear = 2000
+    let maxYear = new Date().getFullYear()
+    let isOffline = false
+
+    try {
+        const client = await getElasticSearchClient()
+        const result = await client.search({
+            index: JurisprudenciaVersion,
+            size: 0,
+            aggs: {
+                areas: {
+                    terms: {
+                        field: "Área.Index.keyword",
+                        size: 100,
+                        order: { _key: "asc" }
+                    }
+                },
+                minYear: {
+                    min: { field: "Data", format: "yyyy" }
+                },
+                maxYear: {
+                    max: { field: "Data", format: "yyyy" }
                 }
-            },
-            minYear: {
-                min: { field: "Data", format: "yyyy" }
-            },
-            maxYear: {
-                max: { field: "Data", format: "yyyy" }
             }
+        })
+
+        const areasBuckets = (result.aggregations?.areas as any)?.buckets || []
+        if (areasBuckets.length > 0) {
+            areas = areasBuckets.map((b: any) => b.key as string)
         }
-    })
+        const parsedMin = parseInt((result.aggregations?.minYear as any)?.value_as_string || "")
+        if (Number.isFinite(parsedMin) && parsedMin > 0) minYear = parsedMin
 
-    const areasBuckets = (result.aggregations?.areas as any)?.buckets || []
-    const areas = areasBuckets.map((b: any) => b.key as string)
-    const minYear = parseInt((result.aggregations?.minYear as any)?.value_as_string || "2000") || 2000
-    const maxYear = parseInt((result.aggregations?.maxYear as any)?.value_as_string || new Date().getFullYear().toString()) || new Date().getFullYear()
+        const parsedMax = parseInt((result.aggregations?.maxYear as any)?.value_as_string || "")
+        if (Number.isFinite(parsedMax) && parsedMax > 0) maxYear = parsedMax
+    } catch (err) {
+        console.warn("Boletim getServerSideProps: Elasticsearch offline, using fallback parameters:", err)
+        isOffline = true
+    }
 
-    return { props: { areas, minYear, maxYear } }
+    return { props: { areas, minYear, maxYear, isOffline } }
 })
 
 const MONTHS = [
@@ -48,7 +71,7 @@ const MONTHS = [
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ]
 
-export default function Boletim({ areas, minYear, maxYear }: BoletimProps) {
+export default function Boletim({ areas, minYear, maxYear, isOffline }: BoletimProps) {
     const router = useRouter()
     const now = new Date()
     const [area, setArea] = useState(areas[0] || "")
@@ -124,7 +147,15 @@ export default function Boletim({ areas, minYear, maxYear }: BoletimProps) {
         <GenericPage title="Jurisprudência STJ - Boletim">
             <div className="row justify-content-center mt-4">
                 <div className="col-12 col-md-8 col-lg-6">
-                    <h3 className="mb-3">Boletim Mensal</h3>
+                    <div className="d-flex align-items-center justify-content-between mb-3">
+                        <h3 className="mb-0">Boletim Mensal</h3>
+                        {isOffline && (
+                            <span className="badge bg-warning text-dark d-flex align-items-center gap-1" style={{ fontSize: "0.75rem" }} title="Serviço Elasticsearch não detetado localmente. A utilizar valores pré-definidos do STJ.">
+                                <i className="bi bi-exclamation-triangle-fill"></i>
+                                <span>Modo Offline / Demonstração</span>
+                            </span>
+                        )}
+                    </div>
                     <div className="card">
                         <div className="card-body">
                             <div className="mb-3">
