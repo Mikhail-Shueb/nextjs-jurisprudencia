@@ -34,7 +34,7 @@ article.result::before {
     content: '';
     background: var(--primary-red);
     top: 10px;
-    width: 4px;
+    width: 3px;
     position: absolute;
     border-radius: 10px;
     bottom: 10px;
