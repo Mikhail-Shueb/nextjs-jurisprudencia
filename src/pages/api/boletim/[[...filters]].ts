@@ -1,7 +1,7 @@
 import { getElasticSearchClient, padZero } from '@/core/elasticsearch';
 import LoggerApi from '@/core/logger-api';
 import { PartialJurisprudenciaDocument } from '@stjiris/jurisprudencia-document';
-import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import PDFDocument from 'pdfkit';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 type BulletinItem = {
@@ -68,206 +68,188 @@ export default LoggerApi(async function datalistHandler(
     let [area = "Área Social", year = currentYear, month = currentMonth, format = "pdf"] = Array.isArray(req.query.filters) ? req.query.filters : req.query.filters ? [req.query.filters] : [];
     let title = `Sumários de Acórdãos - ${area} - ${month}/${year}`;
 
-    // 1. Rota HTML: Geração direta rápida, fiável e sem dependência obrigatória de pandoc CLI
+    // Obter acórdãos do Elasticsearch ou utilizar acórdãos demonstrativos
+    let items: BulletinItem[] = [];
+    let isOffline = false;
+
+    try {
+        const client = await getElasticSearchClient();
+        const r = await client.search<PartialJurisprudenciaDocument>({
+            query: {
+                bool: {
+                    must: [{
+                        term: {
+                            "Área.Index.keyword": area
+                        }
+                    }, {
+                        range: {
+                            "Data": {
+                                gte: `01/${padZero(parseInt(month), 2)}/${padZero(parseInt(year))}`,
+                                lt: `01/${padZero(parseInt(month), 2)}/${padZero(parseInt(year))}\|\|+1M`,
+                                format: "dd/MM/yyyy"
+                            }
+                        }
+                    }]
+                }
+            },
+            size: 50
+        });
+
+        if (r.hits.hits.length > 0) {
+            items = r.hits.hits.map(h => {
+                const src = h._source || {};
+                const descritores = (src.Descritores?.Show || src.Descritores?.Original || []).map((d: any) => `${d}`);
+                const rawSumario = src.Sumário || "Sumário não disponível.";
+                const sumario = rawSumario.replace(/<[^>]+>/g, "").trim();
+                const data = src.Data || "Data N/D";
+                const processo = src["Número de Processo"] || "S/N";
+                const relator = (src["Relator Nome Profissional"]?.Show || ["STJ"]).join(", ");
+                return { descritores, sumario, data, processo, relator };
+            });
+        }
+    } catch (err) {
+        console.warn("Boletim: Elasticsearch offline or query error, serving demonstration summaries:", err);
+        isOffline = true;
+    }
+
+    if (items.length === 0) {
+        items = DEMO_ITEMS_BY_AREA[area] || DEMO_ITEMS_BY_AREA["Área Cível"] || [];
+        isOffline = true;
+    }
+
+    // 1. Rota HTML: Pré-visualização formatada direta
     if (format === "html") {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-
-        let items: BulletinItem[] = [];
-        let isOffline = false;
-
-        try {
-            const client = await getElasticSearchClient();
-            const r = await client.search<PartialJurisprudenciaDocument>({
-                query: {
-                    bool: {
-                        must: [{
-                            term: {
-                                "Área.Index.keyword": area
-                            }
-                        }, {
-                            range: {
-                                "Data": {
-                                    gte: `01/${padZero(parseInt(month), 2)}/${padZero(parseInt(year))}`,
-                                    lt: `01/${padZero(parseInt(month), 2)}/${padZero(parseInt(year))}\|\|+1M`,
-                                    format: "dd/MM/yyyy"
-                                }
-                            }
-                        }]
-                    }
-                },
-                size: 50
-            });
-
-            if (r.hits.hits.length > 0) {
-                items = r.hits.hits.map(h => {
-                    const src = h._source || {};
-                    const descritores = (src.Descritores?.Show || src.Descritores?.Original || []).map((d: any) => `${d}`);
-                    const sumario = src.Sumário || "Sumário não disponível.";
-                    const data = src.Data || "Data N/D";
-                    const processo = src["Número de Processo"] || "S/N";
-                    const relator = (src["Relator Nome Profissional"]?.Show || ["STJ"]).join(", ");
-                    return { descritores, sumario, data, processo, relator };
-                });
-            }
-        } catch (err) {
-            console.warn("Boletim HTML: Elasticsearch offline or query error, serving demonstration summaries:", err);
-            isOffline = true;
-        }
-
-        if (items.length === 0) {
-            items = DEMO_ITEMS_BY_AREA[area] || DEMO_ITEMS_BY_AREA["Área Cível"] || [];
-            isOffline = true;
-        }
-
         const html = renderBulletinHtml(title, area, year, month, items, isOffline);
         res.status(200).send(html);
         return;
     }
 
-    // 2. Rota PDF: Tenta compilar via Pandoc/XeLaTeX; se indisponível, devolve alternativa informativa
+    // 2. Rota PDF: Geração binária de PDF nativa, universal e fiável via PDFKit
     if (format === "pdf") {
-        let pandocProc: ChildProcessWithoutNullStreams | null = null;
-        let wls: ((...args: string[]) => boolean) | null = null;
-
-        try {
-            const convertRes = convert(title, format);
-            pandocProc = convertRes[0];
-            wls = convertRes[1];
-        } catch (err) {
-            console.warn("Pandoc spawn failed:", err);
-            renderPdfUnavailable(res, area, year, month);
-            return;
-        }
-
-        let processFailed = false;
-
-        pandocProc.on("error", (err) => {
-            processFailed = true;
-            console.warn("Pandoc process error (CLI missing or failed):", err);
-            if (!res.headersSent) {
-                renderPdfUnavailable(res, area, year, month);
-            }
-        });
-
-        res.writeHead(200, {
-            "Content-Type": "application/pdf",
-            "Content-Disposition": `inline; filename="boletim-${area}-${year}-${month}.pdf"`
-        });
-
-        pandocProc.stderr.pipe(process.stderr);
-        pandocProc.stdout.pipe(res);
-
-        try {
-            const client = await getElasticSearchClient();
-            let r = await client.search<PartialJurisprudenciaDocument>({
-                query: {
-                    bool: {
-                        must: [{
-                            term: {
-                                "Área.Index.keyword": area
-                            }
-                        }, {
-                            range: {
-                                "Data": {
-                                    gte: `01/${padZero(parseInt(month), 2)}/${padZero(parseInt(year))}`,
-                                    lt: `01/${padZero(parseInt(month), 2)}/${padZero(parseInt(year))}\|\|+1M`,
-                                    format: "dd/MM/yyyy"
-                                }
-                            }
-                        }]
-                    }
-                },
-                scroll: "30s"
-            });
-
-            while (r.hits.hits.length > 0 && !processFailed) {
-                for (let hit of r.hits.hits) {
-                    wls!(`<div style="page-break-after: always;">\n`);
-                    if (hit._source?.Descritores?.Show || hit._source?.Descritores?.Original) {
-                        wls!(`---\n`);
-                        wls!(...(hit._source?.Descritores.Show || hit._source?.Descritores.Original).map((d: any) => `**${`${d}`.replace(/`/g, "")}**\n`));
-                        wls!(`---\n`);
-                        wls!(`<div>`);
-                        wls!(hit._source.Sumário || "Sumário não disponível");
-                        wls!(`</div>`);
-                        wls!(`${hit._source['Data']}\n`);
-                        wls!(`Proc. nº ${hit._source['Número de Processo']}\n`);
-                        wls!(`${hit._source['Relator Nome Profissional']?.Show?.join("\n") || "STJ"}\n`);
-                    }
-                    wls!(`</div>\n`);
-                }
-                r = await client.scroll({ scroll_id: r._scroll_id, scroll: "30s" });
-            }
-        } catch (e) {
-            console.error("Elasticsearch error during PDF streaming:", e);
-        } finally {
-            try { pandocProc.stdin.end(); } catch {}
-        }
-
-        return await new Promise<void>(resolve => {
-            pandocProc?.stdout.on("end", resolve);
-            pandocProc?.on("close", resolve);
-        });
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="boletim-${encodeURIComponent(area)}-${year}-${month}.pdf"`);
+        await renderBulletinPdf(res, title, area, year, month, items, isOffline);
+        return;
     }
 
     res.status(400).send("Formato não suportado.");
 });
 
-function convert(title: string, format: string) {
-    let proc: ChildProcessWithoutNullStreams;
-    if (format === "pdf") {
-        proc = spawn("pandoc", ["-t", format, "-o", "-", "--standalone", "--pdf-engine", "xelatex", "--template", "pdf-template.tex"], {});
-    }
-    else {
-        proc = spawn("pandoc", ["-t", format, "-o", "-", "--standalone"], {});
-    }
+function renderBulletinPdf(
+    res: NextApiResponse,
+    title: string,
+    area: string,
+    year: string,
+    month: string,
+    items: BulletinItem[],
+    isOffline: boolean
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({
+            size: 'A4',
+            margin: 45,
+            bufferPages: true,
+            info: {
+                Title: title,
+                Author: 'Supremo Tribunal de Justiça',
+                Subject: `Boletim Mensal - ${area} (${month}/${year})`
+            }
+        });
 
-    let wls = (...args: string[]) => proc.stdin.write(args.join("\n") + "\n");
+        doc.pipe(res);
 
-    wls(`---`);
-    wls(`title: ${title}`);
-    wls(`output:`);
-    wls(`   beamer_presentation:`);
-    wls(`       keep_tex: true`);
-    wls(`header-includes:`);
-    wls(` - \\usepackage{fancyhdr}`);
-    wls(` - \\pagestyle{fancy}`);
-    wls(` - \\fancyhead{}`);
-    wls(` - \\fancyhead[L]{${title}}`);
-    wls(`---\n`);
+        // Header Superior
+        doc.rect(45, 45, 505, 4).fill('#0f172a');
+        doc.moveDown(0.8);
 
-    return [proc, wls] as const;
-}
+        doc.font('Helvetica-Bold').fontSize(16).fillColor('#0f172a').text('SUPREMO TRIBUNAL DE JUSTIÇA');
+        doc.font('Helvetica-Bold').fontSize(12).fillColor('#0284c7').text(title);
+        doc.font('Helvetica').fontSize(9).fillColor('#64748b').text(`Publicação Oficial de Jurisprudência • Período: ${month}/${year}`);
+        doc.moveDown(0.5);
 
-function renderPdfUnavailable(res: NextApiResponse, area: string, year: string, month: string) {
-    if (res.headersSent) return;
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(`<!DOCTYPE html>
-<html lang="pt">
-<head>
-    <meta charset="utf-8">
-    <title>Geração Direta de PDF Indisponível</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 2rem; display: flex; justify-content: center; align-items: center; min-height: 80vh; }
-        .card { background: white; padding: 2.5rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); max-width: 580px; border-left: 5px solid #0284c7; }
-        h2 { margin-top: 0; color: #0f172a; font-size: 1.4rem; }
-        p { line-height: 1.6; color: #475569; }
-        .btn { display: inline-block; background: #0284c7; color: white; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; font-weight: 500; margin-top: 1rem; }
-        .btn:hover { background: #0369a1; }
-        code { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h2>Compilação Direta de PDF Indisponível no Host Local</h2>
-        <p>A compilação de ficheiros PDF binários via <strong>XeLaTeX</strong> requer o binário do <code>pandoc</code> e distribuição TeX instalados no sistema operativo anfitrião, ou a execução da aplicação através do contentor Docker oficial (<code>clitools</code>).</p>
-        <p><strong>Como obter o PDF no navegador:</strong><br>
-        1. Regresse à página do Boletim e clique em <strong>"Gerar Boletim"</strong> (Pré-visualização HTML).<br>
-        2. Utilize a funcionalidade nativa do seu browser para Imprimir/Guardar como PDF (atalho <code>Ctrl + P</code>).</p>
-        <a href="javascript:window.close()" class="btn">Fechar Janela</a>
-    </div>
-</body>
-</html>`);
+        // Linha divisória
+        doc.strokeColor('#cbd5e1').lineWidth(1).moveTo(45, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown(0.8);
+
+        if (isOffline) {
+            const bannerY = doc.y;
+            doc.rect(45, bannerY, 505, 24).fill('#fffbeb');
+            doc.strokeColor('#f59e0b').lineWidth(1).rect(45, bannerY, 505, 24).stroke();
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#b45309')
+               .text('Modo Offline / Demonstração: ', 55, bannerY + 7, { continued: true })
+               .font('Helvetica').fillColor('#92400e')
+               .text(`Elasticsearch não detetado localmente. A apresentar acórdãos modelo para ${area}.`);
+            doc.moveDown(1.5);
+        }
+
+        // Acórdãos
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+
+            if (doc.y > 670) {
+                doc.addPage();
+            }
+
+            const itemStartY = doc.y;
+
+            // Metadados
+            doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#0f172a')
+               .text(`Processo: ${item.processo}`, 55, doc.y, { continued: true })
+               .font('Helvetica').fillColor('#64748b')
+               .text(`   •   Data: ${item.data}   •   Relator: ${item.relator}`);
+
+            doc.moveDown(0.35);
+
+            // Descritores
+            if (item.descritores.length > 0) {
+                doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0369a1')
+                   .text('Descritores: ', 55, doc.y, { continued: true })
+                   .font('Helvetica').fillColor('#334155')
+                   .text(item.descritores.join('  •  '));
+                doc.moveDown(0.3);
+            }
+
+            // Sumário
+            doc.font('Helvetica').fontSize(9).fillColor('#1e293b')
+               .text(item.sumario, 55, doc.y, {
+                   width: 495,
+                   align: 'justify',
+                   lineGap: 2
+               });
+
+            doc.moveDown(0.8);
+
+            // Barra lateral azul
+            const itemEndY = doc.y;
+            doc.rect(45, itemStartY, 3, itemEndY - itemStartY).fill('#0284c7');
+
+            // Separador entre acórdãos
+            if (i < items.length - 1) {
+                doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(45, doc.y).lineTo(550, doc.y).stroke();
+                doc.moveDown(0.8);
+            }
+        }
+
+        // Adicionar numeração de página em todas as páginas guardadas
+        const range = doc.bufferedPageRange();
+        for (let p = range.start; p < range.start + range.count; p++) {
+            doc.switchToPage(p);
+            doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(45, doc.page.height - 38).lineTo(550, doc.page.height - 38).stroke();
+            doc.font('Helvetica').fontSize(8).fillColor('#94a3b8')
+               .text('Supremo Tribunal de Justiça — República Portuguesa', 45, doc.page.height - 28);
+            doc.font('Helvetica').fontSize(8).fillColor('#94a3b8')
+               .text(`Página ${p + 1} de ${range.count}`, 45, doc.page.height - 28, {
+                   width: 505,
+                   align: 'right'
+               });
+        }
+
+        doc.end();
+
+        res.on('finish', resolve);
+        res.on('error', reject);
+    });
 }
 
 function renderBulletinHtml(
