@@ -137,10 +137,23 @@ function Properties({ accessKey, accessValue, noLink }: { accessKey: string, acc
 
 
 function ShowOrOriginal(props: { accessKey: string, value: { Show?: string[], Original?: string[] }, noLink?: boolean }) {
-    if (props.value.Show && props.value.Show.length > 0) {
-        return <>{props.value.Show.flatMap((v, i) => [" / ", props.noLink ? v : <Link key={i} href={`/pesquisa?${props.accessKey}=${encodeURIComponent(v)}`}>{v}</Link>]).slice(1)}</>
+    const [showOrig, setShowOrig] = useState(false);
+    const show = props.value.Show ?? [];
+    const original = props.value.Original ?? [];
+
+    // nothing normalized to show — just render the raw
+    if (show.length === 0) {
+        return <>{original.flatMap((v, i) => [" / ", v]).slice(1)}</>
     }
-    else {
-        return <>{props.value.Original?.flatMap((v, i) => [" / ", v]).slice(1)}</>
-    }
+
+    // offer "ver original" whenever the shown (normalized) value differs from the raw one,
+    // e.g. a value that fell back to "Outro" / "Sem informação"
+    const differs = original.length > 0 && (show.length !== original.length || show.some((v, i) => v !== original[i]));
+    const values = showOrig ? original : show;
+    const linkable = !showOrig && !props.noLink;
+
+    return <>
+        {values.flatMap((v, i) => [" / ", linkable ? <Link key={i} href={`/pesquisa?${props.accessKey}=${encodeURIComponent(v)}`}>{v}</Link> : v]).slice(1)}
+        {differs && <a role="button" onClick={() => setShowOrig(s => !s)} title="Ver o valor original (antes da normalização)" style={{ marginLeft: 8, fontSize: "0.8em", cursor: "pointer", color: "var(--primary-red)" }}>{showOrig ? "(ver normalizado)" : "(ver original)"}</a>}
+    </>
 }
