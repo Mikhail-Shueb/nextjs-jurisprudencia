@@ -29,6 +29,7 @@ services:
             SYNC_MS_CLIENT_SECRET: ${SYNC_MS_CLIENT_SECRET:-}
             SYNC_MS_MAILBOX: ${SYNC_MS_MAILBOX:-}
             SYNC_MS_TRUSTED_FROM: ${SYNC_MS_TRUSTED_FROM:-}
+            SYNC_MS_CC: ${SYNC_MS_CC:-}
         ports:
             - "${SERVER_HOST:-0.0.0.0}:${SERVER_PORT:-3000}:3000"
         volumes:
@@ -69,6 +70,7 @@ services:
             SYNC_MS_CLIENT_SECRET: ${SYNC_MS_CLIENT_SECRET:-}
             SYNC_MS_MAILBOX: ${SYNC_MS_MAILBOX:-}
             SYNC_MS_RECIPIENT: ${SYNC_MS_RECIPIENT:-}
+            SYNC_MS_CC: ${SYNC_MS_CC:-}
         ports:
             - "${SERVER_HOST:-0.0.0.0}:${SERVER_PORT:-3000}:3000"
         volumes:
