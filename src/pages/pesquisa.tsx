@@ -12,6 +12,7 @@ import { modifySearchParams, SelectNavigate } from "@/components/main_pages/Sele
 import JurisprudenciaItem from "@/components/main_pages/search/JurisprudenciaItem"
 import JurisprudenciaTable from "@/components/main_pages/search/JurisprudenciaTable"
 import { useAuth } from "@/contexts/auth"
+import SavedSessionsQuickButtons from "@/components/saved_sessions/SavedSessionsQuickButtons"
 
 interface PesquisaProps extends FormProps {
     searchedArray: string[]
@@ -67,7 +68,7 @@ function ShowResults({results, searchParams, searchInfo}: {results: SearchHandle
                 </div>
             </div>
         )}
-        <div className="mb-2 d-flex align-items-center gap-2">
+        <div className="mb-2 d-flex align-items-center flex-wrap gap-2">
             <SelectNavigate name="rpp-select" className="me-1" defaultValue={rpp} valueToHref={(v, params) => {
                                                                                                     const newParams = modifySearchParams(params, "rpp", v);
                                                                                                     return `/pesquisa?${modifySearchParams(newParams, "page", "0")}`;
@@ -83,6 +84,7 @@ function ShowResults({results, searchParams, searchInfo}: {results: SearchHandle
                 <option value="asc">Data Ascendente</option>
                 <option value="des">Data Descendente</option>
             </SelectNavigate>
+            <SavedSessionsQuickButtons />
         </div>
         {auth ? (
             <JurisprudenciaTable results={results} searchId={searchInfo.searchId ?? undefined} />

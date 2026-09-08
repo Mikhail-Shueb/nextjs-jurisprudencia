@@ -196,6 +196,7 @@ export async function saveSession(
             // Prepend new save
             const updated = [newSave, ...current.filter(s => s.id !== newSave.id)];
             window.localStorage.setItem(STORAGE_KEY_SAVES, JSON.stringify(updated));
+            window.dispatchEvent(new Event("juris-sessions-updated"));
         } catch (e) {
             console.error("[session-saves] Failed to save session to localStorage:", e);
         }
@@ -216,6 +217,7 @@ export function updateSessionName(id: string, newName: string): boolean {
         item.name = newName.trim();
         item.updatedAt = Date.now();
         window.localStorage.setItem(STORAGE_KEY_SAVES, JSON.stringify(current));
+        window.dispatchEvent(new Event("juris-sessions-updated"));
         return true;
     } catch {
         return false;
@@ -231,6 +233,7 @@ export function deleteSavedSession(id: string): boolean {
         const current = getSavedSessions();
         const updated = current.filter(s => s.id !== id);
         window.localStorage.setItem(STORAGE_KEY_SAVES, JSON.stringify(updated));
+        window.dispatchEvent(new Event("juris-sessions-updated"));
         return true;
     } catch {
         return false;
@@ -351,6 +354,7 @@ export async function importSavesFromJsonString(jsonString: string): Promise<{ i
             const existingIds = new Set(current.map(s => s.id));
             const merged = [...validSaves.filter(s => !existingIds.has(s.id)), ...current];
             window.localStorage.setItem(STORAGE_KEY_SAVES, JSON.stringify(merged));
+            window.dispatchEvent(new Event("juris-sessions-updated"));
         }
 
         return { imported, errors };

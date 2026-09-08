@@ -32,7 +32,11 @@ export default function Header(props: { keys_to_remove: string[] }) {
         };
         updateCount();
         window.addEventListener("storage", updateCount);
-        return () => window.removeEventListener("storage", updateCount);
+        window.addEventListener("juris-sessions-updated", updateCount);
+        return () => {
+            window.removeEventListener("storage", updateCount);
+            window.removeEventListener("juris-sessions-updated", updateCount);
+        };
     }, []);
 
     return <>
