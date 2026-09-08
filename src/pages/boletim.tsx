@@ -99,29 +99,34 @@ export default function Boletim({ areas, minYear, maxYear, isOffline }: BoletimP
         return `${router.basePath}/api/boletim/${encodeURIComponent(area)}/${year}/${month}/pdf`
     }, [router.basePath, area, year, month])
 
-    // Count acórdãos for the current combination to guard both buttons.
+    // Count acórdãos for the current combination and automatically update previewUrl.
     useEffect(() => {
         let cancelled = false
         setCount(null)
+        const currentHtmlUrl = `${router.basePath}/api/boletim/${encodeURIComponent(area)}/${year}/${month}/html`
         const params = new URLSearchParams({ area, year, month })
+
         fetch(`${router.basePath}/api/boletim/count?${params.toString()}`)
             .then(r => r.json())
             .then(({ count }) => {
                 if (cancelled) return
                 setCount(count)
-                // Auto-generate the HTML preview once, on first page entry.
-                if (!didInit.current && count > 0) {
-                    didInit.current = true
-                    setPreviewUrl(`${router.basePath}/api/boletim/${encodeURIComponent(area)}/${year}/${month}/html`)
+                if (count > 0) {
+                    setPreviewUrl(currentHtmlUrl)
+                } else {
+                    setPreviewUrl(null)
                 }
             })
-            .catch(() => { if (!cancelled) setCount(0) })
+            .catch(() => {
+                if (!cancelled) {
+                    setCount(0)
+                    setPreviewUrl(null)
+                }
+            })
         return () => { cancelled = true }
     }, [router.basePath, area, year, month])
 
     const hasAcordaos = count !== null && count > 0
-    const previewStale = previewUrl !== htmlUrl
-    const pdfStale = lastPdfUrl !== pdfUrl
 
     const previewRef = useRef<HTMLDivElement>(null)
     const shouldScroll = useRef(false)
@@ -132,10 +137,9 @@ export default function Boletim({ areas, minYear, maxYear, isOffline }: BoletimP
     }
     const generatePdf = () => {
         window.open(pdfUrl, "_blank", "noopener,noreferrer")
-        setLastPdfUrl(pdfUrl)
     }
 
-    // Scroll the preview into view when the user generates it, so only the iframe is visible.
+    // Scroll the preview into view when the user clicks generatePreview.
     useEffect(() => {
         if (previewUrl && shouldScroll.current) {
             shouldScroll.current = false
@@ -181,7 +185,7 @@ export default function Boletim({ areas, minYear, maxYear, isOffline }: BoletimP
                                         onChange={e => setYear(e.target.value)}
                                     >
                                         {years.map(y => (
-                                            <option key={y} value={y}>{y}</option>
+                                           <option key={y} value={y}>{y}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -202,7 +206,7 @@ export default function Boletim({ areas, minYear, maxYear, isOffline }: BoletimP
                             {count === null ? (
                                 <div className="d-flex align-items-center text-muted">
                                     <SmallSpinner className="me-2" />
-                                    A verificar acórdãos...
+                                    A verificar acórdãos e a atualizar pré-visualização...
                                 </div>
                             ) : count === 0 ? (
                                 <div className="alert alert-warning mb-0" role="alert">
@@ -214,19 +218,23 @@ export default function Boletim({ areas, minYear, maxYear, isOffline }: BoletimP
                                         <button
                                             type="button"
                                             className="btn btn-primary w-100"
-                                            disabled={!hasAcordaos || !previewStale}
+                                            disabled={!hasAcordaos}
                                             onClick={generatePreview}
+                                            title="Deslocar a página para a pré-visualização do boletim"
                                         >
-                                            Gerar Boletim
+                                            <i className="bi bi-eye me-1"></i>
+                                            Ver Pré-visualização
                                         </button>
                                     </div>
                                     <div className="col-6">
                                         <button
                                             type="button"
                                             className="btn btn-outline-primary w-100"
-                                            disabled={!hasAcordaos || !pdfStale}
+                                            disabled={!hasAcordaos}
                                             onClick={generatePdf}
+                                            title="Descarregar ou abrir o Boletim em formato PDF"
                                         >
+                                            <i className="bi bi-file-earmark-pdf me-1"></i>
                                             Gerar PDF
                                         </button>
                                     </div>
@@ -235,9 +243,16 @@ export default function Boletim({ areas, minYear, maxYear, isOffline }: BoletimP
                         </div>
                     </div>
                     {previewUrl && (
-                        <div className="card mt-3" ref={previewRef} style={{ scrollMarginTop: "0.5rem" }}>
+                        <div className="card mt-3 shadow-sm" ref={previewRef} style={{ scrollMarginTop: "0.5rem" }}>
+                            <div className="card-header bg-white d-flex align-items-center justify-content-between py-2">
+                                <span className="small fw-semibold text-secondary d-flex align-items-center gap-1">
+                                    <i className="bi bi-eye"></i> Pré-visualização ao vivo: {area} ({month}/{year})
+                                </span>
+                                <span className="badge bg-light text-dark border">Atualização automática</span>
+                            </div>
                             <div className="card-body p-0">
                                 <iframe
+                                    key={previewUrl}
                                     src={previewUrl}
                                     title="Pré-visualização do boletim"
                                     className="w-100 border-0"
