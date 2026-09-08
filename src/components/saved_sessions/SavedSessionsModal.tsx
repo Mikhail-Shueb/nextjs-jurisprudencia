@@ -91,9 +91,9 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
     };
 
     const handleDelete = (saveId: string, name: string) => {
-        if (confirm(`Tens a certeza que desejas eliminar a gravação "${name}"?`)) {
+        if (confirm(`Tens a certeza que desejas eliminar do histórico "${name}"?`)) {
             deleteSavedSession(saveId);
-            setFeedbackMsg({ text: `Gravação eliminada.`, type: "info" });
+            setFeedbackMsg({ text: `Pesquisa removida do histórico.`, type: "info" });
             refreshData();
         }
     };
@@ -124,9 +124,9 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
             const text = await file.text();
             const res = await importSavesFromJsonString(text);
             if (res.imported > 0) {
-                setFeedbackMsg({ text: `${res.imported} gravação(ões) importada(s) com sucesso!`, type: "success" });
+                setFeedbackMsg({ text: `${res.imported} pesquisa(s) importada(s) para o histórico com sucesso!`, type: "success" });
             } else {
-                setFeedbackMsg({ text: "Nenhuma gravação válida encontrada no ficheiro.", type: "danger" });
+                setFeedbackMsg({ text: "Nenhuma pesquisa válida encontrada no ficheiro.", type: "danger" });
             }
             await refreshData();
         } catch (err) {
@@ -145,15 +145,15 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                 <div className="modal-content shadow-lg border-0">
                     <div className="modal-header bg-light border-bottom">
                         <div className="d-flex align-items-center gap-2">
-                            <div className="bg-primary bg-opacity-10 text-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: 40, height: 40 }}>
-                                <i className="bi bi-floppy2-fill fs-5"></i>
+                            <div className="bg-primary text-white rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: 40, height: 40 }}>
+                                <i className="bi bi-clock-history fs-5"></i>
                             </div>
                             <div>
                                 <h5 className="modal-title m-0 fw-bold" id={`${id}-label`}>
-                                    Histórico e Pesquisas Guardadas
+                                    Histórico de Pesquisas
                                 </h5>
                                 <small className="text-muted">
-                                    Gravações locais no browser com hash de integridade SHA-256 (sem conta)
+                                    Pesquisas guardadas localmente no browser com hash de integridade SHA-256 (sem conta)
                                 </small>
                             </div>
                         </div>
@@ -180,7 +180,7 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                                         <input
                                             type="text"
                                             className="form-control form-control-sm"
-                                            placeholder="Nome da gravação (ex.: Pesquisa de Tese - Danos Morais)"
+                                            placeholder="Nome da pesquisa (ex.: Pesquisa de Tese - Danos Morais)"
                                             value={customName}
                                             onChange={(e) => setCustomName(e.target.value)}
                                         />
@@ -192,7 +192,7 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                                             disabled={isSaving}
                                         >
                                             <i className="bi bi-save2"></i>
-                                            <span>Guardar Slot</span>
+                                            <span>Guardar no Histórico</span>
                                         </button>
                                     </div>
                                     {!hasActiveSearchParams && (
@@ -253,17 +253,17 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                         <div className="d-flex align-items-center justify-content-between mb-2 mt-3">
                             <h6 className="fw-bold m-0 d-flex align-items-center gap-2">
                                 <i className="bi bi-collection"></i>
-                                Gravações Guardadas ({saves.length})
+                                Pesquisas no Histórico ({saves.length})
                             </h6>
                             {saves.length > 0 && (
                                 <button
                                     type="button"
                                     className="btn btn-outline-secondary btn-sm py-0 px-2"
                                     onClick={() => exportSavesToJsonFile()}
-                                    title="Descarregar todas as pesquisas guardadas em formato JSON"
+                                    title="Descarregar histórico de pesquisas em formato JSON"
                                 >
                                     <i className="bi bi-box-arrow-up me-1"></i>
-                                    Exportar Tudo (.json)
+                                    Exportar Histórico (.json)
                                 </button>
                             )}
                         </div>
@@ -272,9 +272,9 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                         {saves.length === 0 ? (
                             <div className="text-center py-5 border rounded bg-light">
                                 <i className="bi bi-inbox text-muted fs-1 d-block mb-2"></i>
-                                <h6 className="fw-semibold text-muted">Nenhuma gravação guardada ainda</h6>
+                                <h6 className="fw-semibold text-muted">Nenhuma pesquisa no histórico ainda</h6>
                                 <p className="text-muted small mb-0 max-w-md mx-auto px-3">
-                                    Pesquisa com os filtros ou termos pretendidos e clica em <b>"Guardar Pesquisa"</b> para criares um save file no teu navegador.
+                                    Pesquisa com os filtros ou termos pretendidos e clica em <b>"Guardar Pesquisa"</b> para adicionares ao teu histórico.
                                 </p>
                             </div>
                         ) : (
@@ -371,7 +371,7 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                                                             type="button"
                                                             className="btn btn-sm btn-outline-danger"
                                                             onClick={() => handleDelete(save.id, save.name)}
-                                                            title="Eliminar gravação"
+                                                            title="Eliminar do histórico"
                                                         >
                                                             <i className="bi bi-trash"></i>
                                                         </button>
@@ -400,7 +400,7 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 <i className="bi bi-upload"></i>
-                                <span>Importar Ficheiro .json</span>
+                                <span>Importar Histórico (.json)</span>
                             </button>
                         </div>
                         <button type="button" className="btn btn-sm btn-secondary" data-bs-dismiss="modal">
