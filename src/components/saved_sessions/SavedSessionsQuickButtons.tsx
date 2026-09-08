@@ -38,10 +38,10 @@ export default function SavedSessionsQuickButtons({ className = "" }: { classNam
                 style={{ fontSize: "0.82rem" }}
                 data-bs-toggle="modal"
                 data-bs-target="#modal-saved-sessions"
-                title="Ver e carregar pesquisas guardadas no navegador"
+                title="Ver e carregar histórico de pesquisas guardadas no navegador"
             >
-                <i className="bi bi-folder2-open"></i>
-                <span>Sessões</span>
+                <i className="bi bi-clock-history"></i>
+                <span>Histórico</span>
                 {savedSessionsCount > 0 && (
                     <span className="badge bg-secondary ms-1" style={{ fontSize: "0.68rem" }}>
                         {savedSessionsCount}

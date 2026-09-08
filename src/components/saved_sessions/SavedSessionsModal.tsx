@@ -150,7 +150,7 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                             </div>
                             <div>
                                 <h5 className="modal-title m-0 fw-bold" id={`${id}-label`}>
-                                    Sessões e Pesquisas Guardadas
+                                    Histórico e Pesquisas Guardadas
                                 </h5>
                                 <small className="text-muted">
                                     Gravações locais no browser com hash de integridade SHA-256 (sem conta)
@@ -243,7 +243,7 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
                                         onClick={() => handleLoadSave(lastSession)}
                                     >
                                         <i className="bi bi-arrow-counterclockwise"></i>
-                                        <span>Restaurar Última Sessão</span>
+                                        <span>Restaurar Última Pesquisa</span>
                                     </button>
                                 </div>
                             </div>

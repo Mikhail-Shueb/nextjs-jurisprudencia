@@ -21,19 +21,19 @@ describe('SavedSessionsQuickButtons Component', () => {
         });
     });
 
-    it('renders Guardar and Sessões buttons with modal target', () => {
+    it('renders Guardar and Histórico buttons with modal target', () => {
         render(<SavedSessionsQuickButtons />);
 
         const guardarBtn = screen.getByRole('button', { name: /guardar/i });
-        const sessoesBtn = screen.getByRole('button', { name: /sessões/i });
+        const historicoBtn = screen.getByRole('button', { name: /histórico/i });
 
         expect(guardarBtn).toBeInTheDocument();
-        expect(sessoesBtn).toBeInTheDocument();
+        expect(historicoBtn).toBeInTheDocument();
 
         expect(guardarBtn).toHaveAttribute('data-bs-toggle', 'modal');
         expect(guardarBtn).toHaveAttribute('data-bs-target', '#modal-saved-sessions');
-        expect(sessoesBtn).toHaveAttribute('data-bs-toggle', 'modal');
-        expect(sessoesBtn).toHaveAttribute('data-bs-target', '#modal-saved-sessions');
+        expect(historicoBtn).toHaveAttribute('data-bs-toggle', 'modal');
+        expect(historicoBtn).toHaveAttribute('data-bs-target', '#modal-saved-sessions');
     });
 
     it('displays session count badge and updates on juris-sessions-updated event', () => {

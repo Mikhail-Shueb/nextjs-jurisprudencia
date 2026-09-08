@@ -80,10 +80,10 @@ export default function Header(props: { keys_to_remove: string[] }) {
                             className="border-0 nav-link fs-6 bg-transparent d-inline-flex align-items-center gap-1 cursor-pointer"
                             data-bs-toggle="modal"
                             data-bs-target="#modal-saved-sessions"
-                            title="Sessões e Pesquisas Guardadas (sem conta)"
+                            title="Histórico e Pesquisas Guardadas (sem conta)"
                         >
-                            <i className="bi bi-floppy2 text-primary"></i>
-                            <span>Sessões</span>
+                            <i className="bi bi-clock-history text-primary"></i>
+                            <span>Histórico</span>
                             {savedCount > 0 && (
                                 <span className="badge rounded-pill bg-primary ms-1" style={{ fontSize: "0.68rem" }}>
                                     {savedCount}
