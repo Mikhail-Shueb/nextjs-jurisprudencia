@@ -43,7 +43,7 @@ export default function Pesquisa(props: PesquisaProps) {
         {results ?
             results.length > 0 ?
                 <ShowResults results={results} searchParams={searchParams} searchInfo={props} /> :
-                <NoResults /> :
+                <NoResults isOffline={props.isOffline} /> :
             <Loading />
         }
     </GenericPageWithForm>
@@ -57,6 +57,16 @@ function ShowResults({results, searchParams, searchInfo}: {results: SearchHandle
     const rpp = parseInt(searchParams.get("rpp") || "10")
 
     return <>
+        {searchInfo.isOffline && (
+            <div className="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center justify-content-between shadow-sm" style={{ fontSize: "0.85rem" }}>
+                <div className="d-flex align-items-center gap-2">
+                    <i className="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                    <span>
+                        <strong>Modo Demonstração (Elasticsearch Desconectado):</strong> A apresentar resultados demonstrativos filtrados. Inicie o Docker para pesquisar a base integral de 124.580 acórdãos do STJ.
+                    </span>
+                </div>
+            </div>
+        )}
         <div className="mb-2 d-flex align-items-center gap-2">
             <SelectNavigate name="rpp-select" className="me-1" defaultValue={rpp} valueToHref={(v, params) => {
                                                                                                     const newParams = modifySearchParams(params, "rpp", v);
@@ -109,13 +119,25 @@ function NavLink({ page, icon, searchParams }: { page: number, icon: string, sea
     return <Link className="page-link" href={`?${tmp.toString()}`} title={`Ir para a página ${page + 1}`}><i className={`bi ${icon}`}></i></Link>
 }
 
-function NoResults() {
-    return <div className="alert alert-info" role="alert">
-        <h4 className="alert-heading">Sem resultados...</h4>
-        <strong><i className="bi bi-lightbulb-fill"></i> Sugestões:</strong>
-        <ol>
-            <li>Verifique os filtros utilizados (tribunais, relator, data)</li>
-            <li>Verifique o termo pesquisado</li>
-        </ol>
-    </div>
+function NoResults({ isOffline }: { isOffline?: boolean }) {
+    return (
+        <div>
+            {isOffline && (
+                <div className="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center gap-2 shadow-sm" style={{ fontSize: "0.85rem" }}>
+                    <i className="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                    <span>
+                        <strong>Modo Demonstração (Elasticsearch Desconectado):</strong> A pesquisa na base de dados completa do STJ requer o Docker/Elasticsearch ativo.
+                    </span>
+                </div>
+            )}
+            <div className="alert alert-info" role="alert">
+                <h4 className="alert-heading">Sem resultados...</h4>
+                <strong><i className="bi bi-lightbulb-fill"></i> Sugestões:</strong>
+                <ol>
+                    <li>Verifique os filtros utilizados (tribunais, relator, data)</li>
+                    <li>Verifique o termo pesquisado</li>
+                </ol>
+            </div>
+        </div>
+    );
 }

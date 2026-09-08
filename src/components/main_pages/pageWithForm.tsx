@@ -4,9 +4,12 @@ import search, { createQueryDslQueryContainer, DEFAULT_AGGS, populateFilters, Se
 import { ParsedUrlQuery } from "querystring";
 import { authenticatedHandler } from "@/core/user/authenticate";
 
+import { filterMockDecisions, MOCK_DECISIONS } from "@/core/mock-jurisprudencia";
+
 export interface FormProps {
     count: number,
     filtersUsed: Record<string, string[]>,
+    isOffline?: boolean,
 }
 
 export function withForm<
@@ -22,6 +25,7 @@ export function withForm<
         let total = 124580;
         let minAno = 1968;
         let maxAno = 2026;
+        let isOffline = false;
 
         try {
             const authed = await authenticatedHandler(ctx.req);
@@ -40,10 +44,19 @@ export function withForm<
             if (Number.isFinite(parsedMax) && parsedMax > 0 && parsedMax !== Infinity) maxAno = parsedMax;
         } catch (error) {
             console.warn("withForm: Elasticsearch offline, using fallback parameters:", error);
+            isOffline = true;
+            const queryStr = Array.isArray(ctx.query.q) ? ctx.query.q.join(" ") : ctx.query.q || "";
+            if (queryStr.trim().length > 0) {
+                const matches = filterMockDecisions(queryStr);
+                total = matches.length;
+            } else {
+                total = MOCK_DECISIONS.length;
+            }
         }
         let formProps: FormProps = {
-            count: Number.isFinite(total) ? total : 124580,
-            filtersUsed: filtersUsed
+            count: Number.isFinite(total) ? total : 0,
+            filtersUsed: filtersUsed,
+            isOffline
         };
         return {props: await sub(ctx, formProps)}
     }
