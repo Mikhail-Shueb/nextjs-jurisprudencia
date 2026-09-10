@@ -611,7 +611,7 @@ progress {
 .img-thumbnail {
     padding: .25rem;
     background-color: #fff;
-    border: 1px solid #dee2e6;
+    border: 1px solid #adb5bd;
     border-radius: .25rem;
     max-width: 100%;
     height: auto
@@ -2015,7 +2015,7 @@ progress {
     margin-bottom: 1rem;
     color: #212529;
     vertical-align: top;
-    border-color: #dee2e6
+    border-color: #adb5bd
 }
 
 .table>:not(caption)>*>* {
@@ -4398,7 +4398,7 @@ fieldset:disabled .btn {
 }
 
 .nav-tabs {
-    border-bottom: 1px solid #dee2e6
+    border-bottom: 1px solid #adb5bd
 }
 
 .nav-tabs .nav-link {
@@ -4411,7 +4411,7 @@ fieldset:disabled .btn {
 
 .nav-tabs .nav-link:focus,
 .nav-tabs .nav-link:hover {
-    border-color: #e9ecef #e9ecef #dee2e6;
+    border-color: #e9ecef #e9ecef #adb5bd;
     isolation: isolate
 }
 
@@ -4425,7 +4425,7 @@ fieldset:disabled .btn {
 .nav-tabs .nav-link.active {
     color: #495057;
     background-color: #fff;
-    border-color: #dee2e6 #dee2e6 #fff
+    border-color: #adb5bd #adb5bd #fff
 }
 
 .nav-tabs .dropdown-menu {
@@ -5199,7 +5199,7 @@ fieldset:disabled .btn {
     color: #0d6efd;
     text-decoration: none;
     background-color: #fff;
-    border: 1px solid #dee2e6;
+    border: 1px solid #adb5bd;
     transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out, box-shadow .15s ease-in-out
 }
 
@@ -5213,7 +5213,7 @@ fieldset:disabled .btn {
     z-index: 2;
     color: #0a58ca;
     background-color: #e9ecef;
-    border-color: #dee2e6
+    border-color: #adb5bd
 }
 
 .page-link:focus {
@@ -5239,7 +5239,7 @@ fieldset:disabled .btn {
     color: #6c757d;
     pointer-events: none;
     background-color: #fff;
-    border-color: #dee2e6
+    border-color: #adb5bd
 }
 
 .page-link {
@@ -6064,7 +6064,7 @@ fieldset:disabled .btn {
     align-items: center;
     justify-content: space-between;
     padding: 1rem 1rem;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid #adb5bd;
     border-top-left-radius: calc(.3rem - 1px);
     border-top-right-radius: calc(.3rem - 1px)
 }
@@ -6092,7 +6092,7 @@ fieldset:disabled .btn {
     align-items: center;
     justify-content: flex-end;
     padding: .75rem;
-    border-top: 1px solid #dee2e6;
+    border-top: 1px solid #adb5bd;
     border-bottom-right-radius: calc(.3rem - 1px);
     border-bottom-left-radius: calc(.3rem - 1px)
 }
@@ -7347,7 +7347,7 @@ fieldset:disabled .btn {
 }
 
 .border {
-    border: 1px solid #dee2e6 !important
+    border: 1px solid #adb5bd !important
 }
 
 .border-0 {
@@ -7355,7 +7355,7 @@ fieldset:disabled .btn {
 }
 
 .border-top {
-    border-top: 1px solid #dee2e6 !important
+    border-top: 1px solid #adb5bd !important
 }
 
 .border-top-0 {
@@ -7363,7 +7363,7 @@ fieldset:disabled .btn {
 }
 
 .border-end {
-    border-right: 1px solid #dee2e6 !important
+    border-right: 1px solid #adb5bd !important
 }
 
 .border-end-0 {
@@ -7371,7 +7371,7 @@ fieldset:disabled .btn {
 }
 
 .border-bottom {
-    border-bottom: 1px solid #dee2e6 !important
+    border-bottom: 1px solid #adb5bd !important
 }
 
 .border-bottom-0 {
@@ -7379,7 +7379,7 @@ fieldset:disabled .btn {
 }
 
 .border-start {
-    border-left: 1px solid #dee2e6 !important
+    border-left: 1px solid #adb5bd !important
 }
 
 .border-start-0 {

@@ -49,6 +49,18 @@ function stripNonAnon<T extends Record<string, any>>(content: T): T {
     return clone as T;
 }
 
+// Optional CC copied on every sync email, as a running log of what crossed the
+// mailbox. Safe because nothing on the sync bus carries non-anonimized content:
+// interno→externo is stripped by stripNonAnon, and externo→interno originates on
+// externo, which never held it. Set SYNC_MS_CC to enable; empty = no CC.
+function ccRecipients(): { emailAddress: { address: string } }[] {
+    return (process.env.SYNC_MS_CC || "")
+        .split(",")
+        .map(a => a.trim())
+        .filter(a => a.length > 0)
+        .map(address => ({ emailAddress: { address } }));
+}
+
 // --- Signature helpers ---
 
 function computeSig(secret: string, action: SyncAction, uuid: string, ts: number, content?: Record<string, any>): string {
@@ -157,6 +169,7 @@ async function sendSyncEmailInternal(action: SyncAction, uuid: string, content?:
                 subject: `${SYNC_SUBJECT_PREFIX} ${action} ${uuid}`,
                 body: { contentType: "Text", content: emailBody },
                 toRecipients: [{ emailAddress: { address: to } }],
+                ccRecipients: ccRecipients(),
             },
             saveToSentItems: false,
         }),
@@ -499,6 +512,7 @@ async function sendSignedMail(subject: string, payload: SyncPayload): Promise<vo
             subject,
             body: { contentType: "Text", content: emailBody },
             toRecipients: [{ emailAddress: { address: to } }],
+            ccRecipients: ccRecipients(),
         },
         saveToSentItems: false,
     });
