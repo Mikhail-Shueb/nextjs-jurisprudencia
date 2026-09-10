@@ -21,6 +21,8 @@ interface SavedSessionsModalProps {
 export default function SavedSessionsModal({ id = "modal-saved-sessions", onSessionLoaded }: SavedSessionsModalProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const [mounted, setMounted] = useState(false);
+    const [hasActiveSearchParams, setHasActiveSearchParams] = useState(false);
     const [saves, setSaves] = useState<SearchSessionSave[]>([]);
     const [lastSession, setLastSession] = useState<SearchSessionSave | null>(null);
     const [integrityMap, setIntegrityMap] = useState<Record<string, boolean>>({});
@@ -43,13 +45,16 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
     };
 
     useEffect(() => {
+        setMounted(true);
         refreshData();
+        setHasActiveSearchParams(typeof window !== "undefined" && window.location.search.length > 1);
 
         // Listen for modal show event to refresh data
         const modalEl = document.getElementById(id);
         if (modalEl) {
             const handleShow = () => {
                 refreshData();
+                setHasActiveSearchParams(typeof window !== "undefined" && window.location.search.length > 1);
                 setFeedbackMsg(null);
             };
             modalEl.addEventListener("show.bs.modal", handleShow);
@@ -142,7 +147,7 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
         }
     };
 
-    const hasActiveSearchParams = typeof window !== "undefined" && window.location.search.length > 1;
+    if (!mounted) return null;
 
     return (
         <div className="modal fade" id={id} tabIndex={-1} aria-labelledby={`${id}-label`} aria-hidden="true">

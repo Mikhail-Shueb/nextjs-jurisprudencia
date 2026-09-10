@@ -12,8 +12,10 @@ import { modifySearchParams, SelectNavigate } from "@/components/main_pages/Sele
 import JurisprudenciaItem from "@/components/main_pages/search/JurisprudenciaItem"
 import JurisprudenciaTable from "@/components/main_pages/search/JurisprudenciaTable"
 import { useAuth } from "@/contexts/auth"
+import dynamic from "next/dynamic"
 import SavedSessionsQuickButtons from "@/components/saved_sessions/SavedSessionsQuickButtons"
-import SavedSessionsModal from "@/components/saved_sessions/SavedSessionsModal"
+
+const SavedSessionsModal = dynamic(() => import("@/components/saved_sessions/SavedSessionsModal"), { ssr: false })
 
 interface PesquisaProps extends FormProps {
     searchedArray: string[]
