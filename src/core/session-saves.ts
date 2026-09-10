@@ -76,14 +76,15 @@ export type SearchParamsInput = URLSearchParams | { toString(): string } | strin
  * Extract structured parameters from a URLSearchParams, ReadonlyURLSearchParams, or query string.
  */
 export function parseSearchParamsToRecord(searchParams: SearchParamsInput): Record<string, string[]> {
-    const rawString = typeof searchParams === "string" ? searchParams : searchParams.toString();
+    const rawString = (typeof searchParams === "string" ? searchParams : searchParams.toString()).replace(/^\?+/, "");
     const sp = new URLSearchParams(rawString);
     const record: Record<string, string[]> = {};
     
     for (const key of sp.keys()) {
+        const cleanKey = key.replace(/^\?+/, "");
         const values = sp.getAll(key).filter(v => v !== null && v !== undefined && v !== "");
         if (values.length > 0) {
-            record[key] = values;
+            record[cleanKey] = values;
         }
     }
     return record;
@@ -149,7 +150,14 @@ export function getSavedSessions(): SearchSessionSave[] {
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-            return parsed.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+            // Clean up any historical ?? bug from previously saved sessions
+            const cleaned = parsed.map(item => {
+                if (item && item.queryString) {
+                    item.queryString = item.queryString.replace(/^\?+/, "?");
+                }
+                return item;
+            });
+            return cleaned.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
         }
         return [];
     } catch (e) {
@@ -166,8 +174,8 @@ export async function saveSession(
     searchParams: SearchParamsInput,
     pathname: string = "/pesquisa"
 ): Promise<SearchSessionSave> {
-    const params = parseSearchParamsToRecord(searchParams);
-    const queryString = typeof searchParams === "string" ? searchParams : searchParams.toString();
+    const cleanQs = (typeof searchParams === "string" ? searchParams : searchParams.toString()).replace(/^\?+/, "");
+    const params = parseSearchParamsToRecord(cleanQs);
     const hash = await computeParamsHash(params);
     const summary = buildParamsSummary(params);
 
@@ -185,7 +193,7 @@ export async function saveSession(
         updatedAt: now,
         pathname,
         params,
-        queryString: queryString ? `?${queryString}` : "",
+        queryString: cleanQs ? `?${cleanQs}` : "",
         hash,
         summary,
     };
@@ -248,7 +256,11 @@ export function getLastSession(): SearchSessionSave | null {
     try {
         const raw = window.localStorage.getItem(STORAGE_KEY_LAST);
         if (!raw) return null;
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.queryString) {
+            parsed.queryString = parsed.queryString.replace(/^\?+/, "?");
+        }
+        return parsed;
     } catch {
         return null;
     }
@@ -262,8 +274,8 @@ export async function saveLastSession(
     pathname: string = "/pesquisa"
 ): Promise<void> {
     if (typeof window === "undefined" || !window.localStorage) return;
-    const params = parseSearchParamsToRecord(searchParams);
-    const queryString = typeof searchParams === "string" ? searchParams : searchParams.toString();
+    const cleanQs = (typeof searchParams === "string" ? searchParams : searchParams.toString()).replace(/^\?+/, "");
+    const params = parseSearchParamsToRecord(cleanQs);
     
     // Don't save empty/trivial sessions as last session
     if (Object.keys(params).length === 0) return;
@@ -279,7 +291,7 @@ export async function saveLastSession(
         updatedAt: now,
         pathname,
         params,
-        queryString: queryString ? `?${queryString}` : "",
+        queryString: cleanQs ? `?${cleanQs}` : "",
         hash,
         summary,
     };

@@ -227,9 +227,19 @@ function normalize(text: string): string {
     .trim();
 }
 
+function parseMockDate(dStr: string): string {
+  const parts = (dStr || "").split("/");
+  if (parts.length === 3) {
+    return `${parts[2].padStart(4, "0")}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+  }
+  return dStr;
+}
+
 export function filterMockDecisions(
   query?: string,
-  areaFilter?: string
+  areaFilter?: string,
+  minDate?: string,
+  maxDate?: string
 ): SearchHandlerResponseItem[] {
   let list = [...MOCK_DECISIONS];
 
@@ -238,6 +248,28 @@ export function filterMockDecisions(
     list = list.filter(item => {
       const areas = item._source?.Área?.Show || item._source?.Área?.Original || [];
       return areas.some((a: string) => normalize(a).includes(normArea));
+    });
+  }
+
+  if (minDate && minDate.trim().length > 0) {
+    const min = minDate.trim();
+    list = list.filter(item => {
+      const itemDate = parseMockDate(item._source?.Data as string || "");
+      if (!itemDate) return true;
+      if (min.length === 4) return itemDate.slice(0, 4) >= min;
+      if (min.length === 7) return itemDate.slice(0, 7) >= min;
+      return itemDate >= min;
+    });
+  }
+
+  if (maxDate && maxDate.trim().length > 0) {
+    const max = maxDate.trim();
+    list = list.filter(item => {
+      const itemDate = parseMockDate(item._source?.Data as string || "");
+      if (!itemDate) return true;
+      if (max.length === 4) return itemDate.slice(0, 4) <= max;
+      if (max.length === 7) return itemDate.slice(0, 7) <= max;
+      return itemDate <= max;
     });
   }
 

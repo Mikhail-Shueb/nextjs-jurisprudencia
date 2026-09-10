@@ -46,12 +46,12 @@ export function withForm<
             console.warn("withForm: Elasticsearch offline, using fallback parameters:", error);
             isOffline = true;
             const queryStr = Array.isArray(ctx.query.q) ? ctx.query.q.join(" ") : ctx.query.q || "";
-            if (queryStr.trim().length > 0) {
-                const matches = filterMockDecisions(queryStr);
-                total = matches.length;
-            } else {
-                total = MOCK_DECISIONS.length;
-            }
+            const minDate = Array.isArray(ctx.query.MinDate) ? ctx.query.MinDate[0] : ctx.query.MinDate;
+            const maxDate = Array.isArray(ctx.query.MaxDate) ? ctx.query.MaxDate[0] : ctx.query.MaxDate;
+            const area = (Array.isArray(ctx.query["Área.Index.keyword"]) ? ctx.query["Área.Index.keyword"][0] : ctx.query["Área.Index.keyword"] || ctx.query.area) as string | undefined;
+
+            const matches = filterMockDecisions(queryStr, area, minDate, maxDate);
+            total = matches.length;
         }
         let formProps: FormProps = {
             count: Number.isFinite(total) ? total : 0,

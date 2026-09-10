@@ -138,6 +138,18 @@ describe("Session Saves & Integrity Hash System", () => {
             expect(last?.params["q"]).toEqual(["ultima"]);
             expect(last?.params["Área"]).toEqual(["Social"]);
         });
+
+        it("should normalize leading question marks and never produce ?? in queryString", async () => {
+            const saveWithLeadingQuestion = await saveSession("Com Interrogação", "?q=burla&sort=des");
+            expect(saveWithLeadingQuestion.queryString).toBe("?q=burla&sort=des");
+            expect(saveWithLeadingQuestion.params["q"]).toEqual(["burla"]);
+            expect(saveWithLeadingQuestion.params["?q"]).toBeUndefined();
+
+            await saveLastSession("??q=duplo");
+            const last = getLastSession();
+            expect(last?.queryString).toBe("?q=duplo");
+            expect(last?.params["q"]).toEqual(["duplo"]);
+        });
     });
 
     describe("JSON Export & Import", () => {

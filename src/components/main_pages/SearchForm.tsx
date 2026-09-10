@@ -1,7 +1,8 @@
 'use client';
 
 import Link from "next/link";
-import { useRouter as useNavRouter, useSearchParams } from "next/navigation";
+import { NextRouter, useRouter } from "next/router";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useKeysFromContext } from "@/contexts/keys";
 import { FORM_KEY, SwapableFilterList } from "./SwapableFilterList";
@@ -12,7 +13,7 @@ const DATE_HELPERS = new Set(["_MinDay", "_MinMonth", "_MinYear", "_MaxDay", "_M
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-function submit(form: HTMLFormElement, router: ReturnType<typeof useNavRouter>) {
+function submit(form: HTMLFormElement, router: NextRouter) {
     const fd = new FormData(form);
     const searchParams = new URLSearchParams();
     const processedKeys = new Set<string>();
@@ -23,7 +24,7 @@ function submit(form: HTMLFormElement, router: ReturnType<typeof useNavRouter>) 
         processedKeys.add(key);
         const seen = new Set<string>();
         for (const v of fd.getAll(key)) {
-            const s = String(v);
+            const s = String(v).trim();
             if (s.length > 0 && !seen.has(s)) { seen.add(s); searchParams.append(key, s); }
         }
     }
@@ -51,6 +52,9 @@ function submit(form: HTMLFormElement, router: ReturnType<typeof useNavRouter>) 
     const sort = currentParams.get("sort");
     if (sort) searchParams.set("sort", sort);
 
+    // Reset pagination when new query or filters are applied
+    searchParams.delete("page");
+
     router.push(`?${searchParams.toString()}`);
 }
 
@@ -73,7 +77,7 @@ const MONTHS = [
 
 export default function SearchForm({ count, filtersUsed }: { count: number; filtersUsed: Record<string, string[]> }) {
     const form = useRef<HTMLFormElement>(null);
-    const router = useNavRouter();
+    const router = useRouter();
     const submitting = useRef(false);
 
     const minYearRef  = useRef<HTMLInputElement>(null);
@@ -108,6 +112,15 @@ export default function SearchForm({ count, filtersUsed }: { count: number; filt
         if (maxMonthRef.current) { maxMonthRef.current.value = ""; maxMonthRef.current.style.color = "var(--bs-secondary-color, #6c757d)"; }
         if (maxYearRef.current)  { maxYearRef.current.value  = ""; }
     }, []);
+
+    const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (submitting.current || !form.current) return;
+        submitting.current = true;
+        submit(form.current, router);
+        form.current.querySelectorAll<HTMLInputElement>("input[list]").forEach(inp => { inp.value = ""; });
+        submitting.current = false;
+    };
 
     useEffect(() => {
         const el = form.current;
@@ -153,7 +166,7 @@ export default function SearchForm({ count, filtersUsed }: { count: number; filt
     }, [router]);
 
     return (
-        <form ref={form} method="get" className="position-sticky" style={{ top: 0 }}>
+        <form ref={form} onSubmit={handleFormSubmit} method="get" className="position-sticky" style={{ top: 0 }}>
             {term && <input name="term" hidden value={term} readOnly />}
             {group && <input name="group" hidden value={group} readOnly />}
 
@@ -173,11 +186,14 @@ export default function SearchForm({ count, filtersUsed }: { count: number; filt
 
 
                 <div className="input-group input-group-sm my-1">
-                    <span className="input-group-text"><i className="bi bi-search" /></span>
+                    <button type="submit" className="input-group-text btn btn-outline-secondary" title="Pesquisar">
+                        <i className="bi bi-search" />
+                    </button>
                     <input key={q} type="search" name="q" defaultValue={q} className="form-control form-control-sm" placeholder="Pesquisa por texto livre" />
                 </div>
 
                 <DateRangeInput
+                    key={`min-${minDate}`}
                     label="De:"
                     name="MinDate"
                     isMin={true}
@@ -187,6 +203,7 @@ export default function SearchForm({ count, filtersUsed }: { count: number; filt
                     dayRef={minDayRef}
                 />
                 <DateRangeInput
+                    key={`max-${maxDate}`}
                     label="Até:"
                     name="MaxDate"
                     isMin={false}
@@ -235,6 +252,16 @@ function DateRangeInput({ label, name, isMin, defaultValue, yearRef, monthRef, d
     const prefix   = name === "MinDate" ? "Min" : "Max";
     const inputCls = "form-control form-control-sm rounded-0";
     const grey     = "var(--bs-secondary-color, #6c757d)";
+
+    useEffect(() => {
+        if (dayRef.current) dayRef.current.value = dayDefault;
+        if (monthRef.current) {
+            monthRef.current.value = monthDefault;
+            monthRef.current.style.color = monthDefault ? "" : grey;
+        }
+        if (yearRef.current) yearRef.current.value = yearDefault;
+        prevEmpty.current = !yearDefault;
+    }, [defaultValue, dayDefault, monthDefault, yearDefault, dayRef, monthRef, yearRef]);
 
     function handlePickerChange(e: React.ChangeEvent<HTMLInputElement>) {
         const val = e.target.value; // "YYYY-MM-DD"

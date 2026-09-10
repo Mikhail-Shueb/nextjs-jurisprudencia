@@ -75,19 +75,24 @@ export default function SavedSessionsModal({ id = "modal-saved-sessions", onSess
     };
 
     const handleLoadSave = (save: SearchSessionSave) => {
-        const dest = `${save.pathname || "/pesquisa"}${save.queryString || ""}`;
+        const rawQs = (save.queryString || "").replace(/^\?+/, "");
+        const dest = `${save.pathname || "/pesquisa"}${rawQs ? `?${rawQs}` : ""}`;
         
-        // Close bootstrap modal if open
-        if (typeof window !== "undefined" && (window as any).bootstrap) {
+        // Close bootstrap modal if open and clean up backdrop
+        if (typeof window !== "undefined") {
             const modalEl = document.getElementById(id);
-            if (modalEl) {
+            if (modalEl && (window as any).bootstrap) {
                 const modalInstance = (window as any).bootstrap.Modal.getInstance(modalEl);
                 if (modalInstance) modalInstance.hide();
             }
+            document.querySelectorAll(".modal-backdrop").forEach(el => el.remove());
+            document.body.classList.remove("modal-open");
+            document.body.style.removeProperty("overflow");
+            document.body.style.removeProperty("padding-right");
+            
+            if (onSessionLoaded) onSessionLoaded();
+            window.location.assign(dest);
         }
-        
-        if (onSessionLoaded) onSessionLoaded();
-        router.push(dest);
     };
 
     const handleDelete = (saveId: string, name: string) => {

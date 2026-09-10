@@ -132,9 +132,11 @@ export default LoggerApi(async function searchHandler(
         const areaParam = typeof req.query.area === "string"
             ? req.query.area
             : (Array.isArray(req.query["Área.Index.keyword"]) ? req.query["Área.Index.keyword"][0] : req.query["Área.Index.keyword"]) as string | undefined;
+        const minDateParam = typeof req.query.MinDate === "string" ? req.query.MinDate : (Array.isArray(req.query.MinDate) ? req.query.MinDate[0] : undefined);
+        const maxDateParam = typeof req.query.MaxDate === "string" ? req.query.MaxDate : (Array.isArray(req.query.MaxDate) ? req.query.MaxDate[0] : undefined);
 
         // 1. Filtrar o conjunto de acórdãos mock de forma inteligente (respeita termos como 'galinha' devolvendo vazio)
-        let filtered = filterMockDecisions(queryTerm, areaParam);
+        let filtered = filterMockDecisions(queryTerm, areaParam, minDateParam, maxDateParam);
 
         // 2. Aplicar ordenação
         if (sortParam === "asc") {
