@@ -13,6 +13,7 @@ import JurisprudenciaItem from "@/components/main_pages/search/JurisprudenciaIte
 import JurisprudenciaTable from "@/components/main_pages/search/JurisprudenciaTable"
 import { useAuth } from "@/contexts/auth"
 import SavedSessionsQuickButtons from "@/components/saved_sessions/SavedSessionsQuickButtons"
+import SavedSessionsModal from "@/components/saved_sessions/SavedSessionsModal"
 
 interface PesquisaProps extends FormProps {
     searchedArray: string[]
@@ -47,6 +48,7 @@ export default function Pesquisa(props: PesquisaProps) {
                 <NoResults isOffline={props.isOffline} /> :
             <Loading />
         }
+        <SavedSessionsModal />
     </GenericPageWithForm>
 }
 
