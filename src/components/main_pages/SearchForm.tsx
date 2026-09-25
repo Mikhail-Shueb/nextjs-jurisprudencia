@@ -250,7 +250,7 @@ function DateRangeInput({ label, name, isMin, defaultValue, yearRef, monthRef, d
     const datePickerRef = useRef<HTMLInputElement>(null);
 
     const prefix   = name === "MinDate" ? "Min" : "Max";
-    const inputCls = "form-control form-control-sm rounded-0";
+    const inputCls = "form-control form-control-sm";
     const grey     = "var(--bs-secondary-color, #6c757d)";
 
     useEffect(() => {
@@ -288,6 +288,7 @@ function DateRangeInput({ label, name, isMin, defaultValue, yearRef, monthRef, d
                     placeholder="dia"
                     defaultValue={dayDefault}
                     className={inputCls}
+                    style={{ flex: "0 1 3.5rem", minWidth: "3rem" }}
                 />
 
                 {/* Month */}
@@ -295,7 +296,7 @@ function DateRangeInput({ label, name, isMin, defaultValue, yearRef, monthRef, d
                     name={`_${prefix}Month`}
                     ref={monthRef}
                     defaultValue={monthDefault}
-                    className="form-select form-select-sm rounded-0"
+                    className="form-select form-select-sm"
                     style={{ color: monthDefault ? undefined : grey }}
                     onChange={(e) => {
                         e.currentTarget.style.color = e.currentTarget.value ? "" : grey;
@@ -315,6 +316,7 @@ function DateRangeInput({ label, name, isMin, defaultValue, yearRef, monthRef, d
                     placeholder={String(CURRENT_YEAR)}
                     defaultValue={yearDefault}
                     className={inputCls}
+                    style={{ flex: "1 1 4.5rem", minWidth: "4.5rem" }}
                     onInput={(e) => onYearInput(e, prevEmpty)}
                 />
 

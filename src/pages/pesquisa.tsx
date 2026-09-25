@@ -60,6 +60,7 @@ function ShowResults({results, searchParams, searchInfo}: {results: SearchHandle
     const sort = searchParams.get("sort") || "des"
     let page = parseInt(searchParams.get("page") || "0")
     const rpp = parseInt(searchParams.get("rpp") || "10")
+    const searchQuery = searchParams.get("q") || ""
 
     return <>
         {searchInfo.isOffline && (
@@ -93,7 +94,7 @@ function ShowResults({results, searchParams, searchInfo}: {results: SearchHandle
         {auth ? (
             <JurisprudenciaTable results={results} searchId={searchInfo.searchId ?? undefined} />
         ) : (
-            results.map((h, i) => <JurisprudenciaItem key={i} hit={h} searchId={searchInfo.searchId ?? undefined}/>)
+            results.map((h, i) => <JurisprudenciaItem key={i} hit={h} searchId={searchInfo.searchId ?? undefined} hasQuery={!!searchQuery} searchQuery={searchQuery}/>)
         )}
         <article className="row d-print-none">
             <nav>

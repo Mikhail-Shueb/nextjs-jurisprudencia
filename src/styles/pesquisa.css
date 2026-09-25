@@ -23,6 +23,71 @@ article {
     padding-bottom: 2.5px;
 }
 
+article.result {
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem 1rem 1.5rem;
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    background: var(--card-bg);
+}
+
+article.result:hover, article.result:focus-within {
+    border-color: var(--card-border-hover);
+}
+
+.result-title {
+    font-size: 16.5px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+.result-title a {
+    font-weight: 700;
+}
+.result-title .result-title-meta {
+    font-weight: 400;
+    font-size: 13px;
+    color: var(--secondary-gray);
+}
+
+.result-meta {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--secondary-gray);
+    margin: 0.25rem 0 0.5rem;
+}
+.result-meta b {
+    font-weight: 600;
+}
+
+.result-sumario {
+    font-size: 15.5px;
+    line-height: 1.55;
+    white-space: pre-line;
+    background: var(--sumario-tint);
+    border-radius: var(--card-radius);
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.25rem;
+}
+.result-sumario-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+}
+.result-sumario-text.expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+}
+.result-sumario-toggle {
+    font-size: 12px;
+    color: var(--secondary-gray);
+}
+
 .relevancia{
     font-size: 0.65rem;
     align-self: center;
@@ -33,11 +98,12 @@ article {
 article.result::before {
     content: '';
     background: var(--primary-red);
-    top: 10px;
-    width: 3px;
+    top: 12px;
+    left: 0.6rem;
+    width: 2px;
     position: absolute;
     border-radius: 10px;
-    bottom: 10px;
+    bottom: 12px;
 }
 article.result::after {
     /*content: "";*/
@@ -70,4 +136,30 @@ article:focus-within::after, article:hover::after{
     max-width: 250px;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+/* Match result-card rounding on the search filter controls */
+.infofilters .input-group {
+    border-radius: 6px;
+}
+.infofilters .input-group > .form-control,
+.infofilters .input-group > .form-select,
+.infofilters .input-group > .input-group-text,
+.infofilters .input-group > .btn {
+    border-radius: 0;
+}
+.infofilters .input-group > :first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+.infofilters .input-group > .btn:last-child,
+.infofilters .input-group > .form-control:last-child,
+.infofilters .input-group > .form-select:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* Match card rounding on each filter item box (Número de Processo, Descritores, ...) */
+.infofilters .filter-box {
+    border-radius: 6px;
+    overflow: hidden;
 }
