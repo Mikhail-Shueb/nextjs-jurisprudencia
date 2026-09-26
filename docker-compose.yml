@@ -4,6 +4,7 @@ volumes:
   excel_data: {}
   rss_data: {}
   redis_data: {}
+  images_data: {}
 
 services:
   server:
@@ -19,11 +20,13 @@ services:
       NEXT_BASE_PATH: ${NEXT_BASE_PATH}
       PUBLIC_STATES: ${PUBLIC_STATES}
       RSS_FOLDER: /rss
+      IMAGES_PATH: ${IMAGES_PATH:-/images}
     ports:
       - "${SERVER_HOST:-0.0.0.0}:${SERVER_PORT:-3000}:3000"
     volumes:
       - excel_data:/usr/src/app/files
       - rss_data:/rss
+      - images_data:/images
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -43,12 +46,14 @@ services:
       NEXT_BASE_PATH: ${NEXT_DEV_BASE_PATH}
       PUBLIC_STATES: ${PUBLIC_STATES}
       RSS_FOLDER: /rss
+      IMAGES_PATH: ${IMAGES_PATH:-/images}
     ports:
       - "${SERVER_DEV_HOST:-127.0.0.1}:${SERVER_DEV_PORT:-3000}:3000"
     volumes:
       - excel_data:/usr/src/app/files
       - .:/usr/src/app
       - rss_data:/rss
+      - images_data:/images
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -67,8 +72,10 @@ services:
       RSS_FOLDER: /rss
       RSS_LINK: ${RSS_LINK:-http://localhost:3000/jurisprudencia}
       RSS_MAX_FEED_SIZE: 200
+      IMAGES_PATH: ${IMAGES_PATH:-/images}
     volumes:
-      - rss_data:/rss 
+      - rss_data:/rss
+      - images_data:/images 
   elasticsearch:
     build:
       context: ./compose/elasticsearch

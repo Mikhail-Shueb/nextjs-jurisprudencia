@@ -1,5 +1,5 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-import search, { createQueryDslQueryContainer, filterableProps, parseSort, populateFilters, RESULTS_PER_PAGE } from '@/core/elasticsearch';
+import search, { createQueryDslQueryContainer, filterableProps, parseSort, populateFilters, RESULTS_PER_PAGE, SearchFilters } from '@/core/elasticsearch';
 import LoggerApi from '@/core/logger-api';
 import { authenticatedHandler } from '@/core/user/authenticate';
 import { HighlightFragment, SearchHandlerResponse } from '@/types/search';
@@ -13,8 +13,17 @@ export default LoggerApi(async function searchHandler(
   req: NextApiRequest,
   res: NextApiResponse<SearchHandlerResponse>
 ) {
-    const sfilters = {pre: [], after: []};
+    const sfilters: SearchFilters = {pre: [], after: []};
     populateFilters(sfilters, req.query)
+    const imgParam = (Array.isArray(req.query?.IMG) ? req.query.IMG[0] : req.query?.IMG)
+                  || (Array.isArray(req.query?.img) ? req.query.img[0] : req.query?.img);
+    if (imgParam && ["s", "sim", "1", "true", "yes", "y"].includes(imgParam.toLowerCase().trim())) {
+        sfilters.pre.push({
+            term: {
+                hasImages: true
+            }
+        });
+    }
     const sort: SortCombinations[] = [];
     parseSort(Array.isArray(req.query?.sort) ? req.query.sort[0] : req.query.sort, sort)
     const page = parseInt(Array.isArray(req.query.page) ? req.query.page[0] : req.query.page || "" ) || 0
