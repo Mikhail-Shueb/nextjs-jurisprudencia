@@ -462,7 +462,7 @@ function allGenericColumns(hit: SearchHit<JurisprudenciaDocument>, key: typeof J
     let shw = hit._source![key]?.Show || [];
     let ind = hit._source![key]?.Index || [];
     for( let i = 0; i < Math.max(ori?.length,shw?.length, ind?.length); i++){
-        data.push(addHash([ori[i] || "", shw[i] || "", ind[i] || "", hit._id]))
+        data.push(addHash([ori[i] || "", shw[i] || "", ind[i] || "", hit._id || ""]))
     }
     return data
 }

@@ -1,6 +1,5 @@
 import { DatalistObj } from "@/types/search";
 import { JurisprudenciaDocument } from "@stjiris/jurisprudencia-document";
-import { AppRouterInstance } from "next/dist/shared/lib/app-router-context";
 import Link from "next/link";
 import { ReadonlyURLSearchParams, useRouter as useNavRouter, useSearchParams } from "next/navigation";
 import { NextRouter, useRouter } from "next/router";
@@ -9,11 +8,13 @@ import { FORM_KEY, useFormOrderedKeys } from "./formKeys";
 import { replaceSearchParams } from "./select-navigate";
 import { useKeysFromContext } from "@/contexts/keys";
 
-function submit(form: HTMLFormElement, router: AppRouterInstance){
+type AppNavRouter = ReturnType<typeof useNavRouter>;
+
+function submit(form: HTMLFormElement, router: AppNavRouter){
     const fd = new FormData(form);
     const searchParams = new URLSearchParams();
     for( let key of fd.keys() ){
-        let values = fd.getAll(key).filter(v => v.length > 0);
+        let values = fd.getAll(key).filter(v => typeof v === "string" && v.length > 0);
         searchParams.delete(key);
         for( let v of values ){
             searchParams.append(key, v as string)

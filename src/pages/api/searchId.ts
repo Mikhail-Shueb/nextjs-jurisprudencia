@@ -72,7 +72,9 @@ export default LoggerApi(async function datalistHandler(
     let {hits: {hits, total}} = await search(createQueryDslQueryContainer(), sf, page, {}, 5, {_source: ["Relator Nome Profissional", "Data", "Número de Processo", "ECLI","UUID","STATE"]},all);
     let r = {} as {[key: string]: PartialJurisprudenciaDocument}
     for( let hit of hits ){
-        r[hit._id] = hit._source!
+        if (hit._id) {
+            r[hit._id] = hit._source!
+        }
     }
     res.setHeader("Pagination-Count", typeof total === "number" ? total : total?.value || 0)
     res.setHeader("Pagination-Page", page)

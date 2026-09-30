@@ -243,7 +243,7 @@ async function runSuite1_ApiRoute() {
         });
         await imageHandler(req, res);
         assert(getStatusCode() === 405, "1.10 POST method returns HTTP 405 Method Not Allowed");
-        assert(getHeader("allow")?.includes("GET"), "1.10 Allow header contains GET");
+        assert(String(getHeader("allow") || "").includes("GET"), "1.10 Allow header contains GET");
         assert(getJsonBody()?.error === "Method not allowed", "1.10 Error message is 'Method not allowed'");
     }
 
