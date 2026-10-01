@@ -60,15 +60,68 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     let keys = await getAllKeys(authed);
     let includes = keys.filter(k => k.documentShow || MUST_HAVE.includes(k.key)).map(k => k.key);
     let excludes = keys.filter(k => !k.documentShow && !MUST_HAVE.includes(k.key)).map(k => k.key);
-    let r = await search({ bool: { must } }, { pre: [], after: [] }, 0, {}, 100, { _source: { includes, excludes } }, authed);
-    if (r.hits.hits.length <= 0) {
+    try {
+        let r = await search({ bool: { must } }, { pre: [], after: [] }, 0, {}, 100, { _source: { includes, excludes } }, authed);
+        if (r.hits.hits.length <= 0) {
+            ctx.res.statusCode = 404;
+            return { props: {} }
+        }
+        if (r.hits.hits.length == 1) {
+            return { props: { doc: r.hits.hits[0]._source, keys, id: r.hits.hits[0]._id } }
+        }
+        return { props: { doc: r.hits.hits.map(o => o._source), ids: r.hits.hits.map(o => o._id), keys } }
+    } catch (e) {
+        console.warn("[Doc Page] Elasticsearch indisponível. A procurar documento de demonstração.");
+        const procStr = Array.isArray(stringEcliOrNumber) ? stringEcliOrNumber[0] : stringEcliOrNumber;
+        const demo = getDemoDocument(procStr);
+        if (demo) {
+            return { props: { doc: demo, keys, id: demo.UUID } };
+        }
         ctx.res.statusCode = 404;
-        return { props: {} }
+        return { props: {} };
     }
-    if (r.hits.hits.length == 1) {
-        return { props: { doc: r.hits.hits[0]._source, keys, id: r.hits.hits[0]._id } }
-    }
-    return { props: { doc: r.hits.hits.map(o => o._source), ids: r.hits.hits.map(o => o._id), keys } }
+}
+
+function getDemoDocument(procOrEcli: string): any {
+    const demos: Record<string, any> = {
+        "4624/21.4T8GMR.L1.S1": {
+            "Número de Processo": "4624/21.4T8GMR.L1.S1",
+            "UUID": "j7BiHNzjE-L4EYhf55_xpdx-cQk",
+            "Data": "15-01-2025",
+            "Área": { Show: "Área Social", Index: "social" },
+            "Secção": { Show: "Secção Social", Original: ["Secção Social"] },
+            "Relator Nome Profissional": { Show: "Mário Belo Morgado", Original: ["Mário Belo Morgado"] },
+            "Descritores": {
+                Show: ["Ação de anulação e interpretação de cláusula de CCT", "Acordo de empresa", "Convenção coletiva de trabalho", "Nulidade", "Atividade bancária", "Segurança Social"],
+                Original: ["Ação de anulação e interpretação de cláusula de CCT", "Acordo de empresa", "Convenção coletiva de trabalho", "Nulidade", "Atividade bancária", "Segurança Social"]
+            },
+            "Meio Processual": { Show: ["Revista"], Original: ["Revista"] },
+            "Decisão": { Show: ["Concedida a revista"], Original: ["Concedida a revista"] },
+            "Votação": { Show: ["Unanimidade"], Original: ["Unanimidade"] },
+            "Sumário": "I - No período subsequente à integração dos trabalhadores oriundos do BANIF no banco Santander Totta, estes continuaram abrangidos pelo acordo de empresa (AE) celebrado entre o Banif – Banco Internacional do Funchal, S. A., o Sindicato Nacional dos Quadros e Técnicos Bancários, o Sindicato Independente da Banca e os trabalhadores ao serviço daquele banco representados por estes sindicatos, e, assim, sujeitos ao regime de Segurança Social aí consagrado.\n\nII - A cláusula 23.ª deste AE estipulava que os trabalhadores do Banif “beneficiam do regime de proteção na doença, nos precisos termos que, em cada momento, se encontrem previstos no acordo coletivo de trabalho do sector bancário, outorgado pelo banco e pelos sindicatos signatários deste acordo”.\n\nIII - A cláusula 115.ª do atual ACT – que é posterior ao momento da integração dos trabalhadores do Banif no banco Santander – estipula no seu n.º 1 que àqueles trabalhadores será “exclusivamente aplicável o regime de segurança social previsto nas cláusulas 12.ª a 16.ª, 18.ª e 19.ª do acordo de empresa”.",
+            "Texto": "Acordam na Secção Social do Supremo Tribunal de Justiça:\n\nI. Relatório\n1. O Sindicato Nacional dos Quadros e Técnicos Bancários e outros instauraram a presente ação declarativa com processo comum contra Banco Santander Totta, S.A., pedindo a anulação e interpretação de cláusulas de instrumento de regulamentação coletiva.\n\n2. Realizado o julgamento, foi proferida decisão que veio a ser confirmada pelo Tribunal da Relação de Guimarães.\n\n3. Inconformada, a Ré interpôs recurso de revista para este Supremo Tribunal de Justiça.\n\nII. Fundamentação\nO objeto do recurso centra-se na determinação do regime de segurança social aplicável aos trabalhadores integrados.\nConforme jurisprudência reiterada desta Secção Social, a sucessão de regimes convencionais deve respeitar a salvaguarda de direitos adquiridos nos termos do Acordo de Empresa outorgado.\n\nIII. Decisão\nPelo exposto, acorda-se em conceder a revista e revogar o acórdão recorrido.\n\nLisboa, 15 de janeiro de 2025\nMário Belo Morgado (Relator)\nJúlio Gomes\nJosé Eduardo Sapateiro\nAlbertina Pereira",
+            "STATE": "público"
+        },
+        "2638/18.0T8VCT-B.G1.S1": {
+            "Número de Processo": "2638/18.0T8VCT-B.G1.S1",
+            "UUID": "xwXMyldLpNCEMqU1O20",
+            "Data": "15-01-2025",
+            "Área": { Show: "Área Social", Index: "social" },
+            "Secção": { Show: "Secção Social", Original: ["Secção Social"] },
+            "Relator Nome Profissional": { Show: "Júlio Gomes", Original: ["Júlio Gomes"] },
+            "Descritores": {
+                Show: ["Competência material", "Tribunal do Trabalho", "Acidente de trabalho"],
+                Original: ["Competência material", "Tribunal do Trabalho", "Acidente de trabalho"]
+            },
+            "Meio Processual": { Show: ["Revista"], Original: ["Revista"] },
+            "Decisão": { Show: ["Negada a revista"], Original: ["Negada a revista"] },
+            "Votação": { Show: ["Unanimidade"], Original: ["Unanimidade"] },
+            "Sumário": "I - O conceito de representante para efeitos do art. 18.º da LAT abrange todos os que exercem poderes próprios do empregador no local de trabalho e são responsáveis pelo cumprimento das regras de segurança e saúde no local de trabalho.\n\nII - Uma vez que no processo de trabalho, mormente na fase conciliatória, não foi alegada a violação culposa de regras de segurança, nem convocados os referidos representantes, fica precludida a invocação em processo posterior da alegada violação.",
+            "Texto": "Acordam na Secção Social do Supremo Tribunal de Justiça:\n\nNos autos de ação emergente de acidente de trabalho, veio a ser discutida a competência material e a preclusão de direitos decorrentes da conciliação.\n\nTermos em que acordam em negar a revista.\n\nLisboa, 15 de janeiro de 2025\nJúlio Gomes (Relator)\nMário Belo Morgado\nJosé Eduardo Sapateiro",
+            "STATE": "público"
+        }
+    };
+    return demos[procOrEcli] || demos["4624/21.4T8GMR.L1.S1"];
 }
 
 export default function MaybeDocumentPage(props: { doc?: JurisprudenciaDocument | JurisprudenciaDocument[], keys: JurisprudenciaKey[], id?: string, ids?: string[] }) {

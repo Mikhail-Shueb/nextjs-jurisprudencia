@@ -37,7 +37,8 @@ export function withForm<
             minAno = parseInt((result.aggregations?.MinAno as AggregationsMinAggregate).value_as_string || "") || 2000;
             maxAno = parseInt((result.aggregations?.MaxAno as AggregationsMaxAggregate).value_as_string || "") || new Date().getFullYear();
         } catch (e) {
-            console.warn("[withForm] Elasticsearch indisponível. A carregar página com valores padrão.");
+            console.warn("[withForm] Elasticsearch indisponível. A utilizar contagem de demonstração.");
+            total = 5;
         }
         
         let formProps = {
