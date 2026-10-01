@@ -47,39 +47,59 @@ async function getClient() {
 }
 
 export async function getAllKeys(authed: boolean = false) {
-    let client = await getClient();
-    return await client.search<JurisprudenciaKey>({
-        index: KEYS_INFO_INDEX_VERSION,
-        size: JurisprudenciaDocumentKeys.length,
-        sort: [{
-            "filtersOrder": "asc"
-        }, {
-            "key": "asc"
-        }]
-    }).then(r => r.hits.hits.map<JurisprudenciaKey>(({ _source: key }) => {
-        if (!key) throw new Error("Unreachable");
+    try {
+        let client = await getClient();
+        return await client.search<JurisprudenciaKey>({
+            index: KEYS_INFO_INDEX_VERSION,
+            size: JurisprudenciaDocumentKeys.length,
+            sort: [{
+                "filtersOrder": "asc"
+            }, {
+                "key": "asc"
+            }]
+        }).then(r => r.hits.hits.map<JurisprudenciaKey>(({ _source: key }) => {
+            if (!key) throw new Error("Unreachable");
 
-        if (!authed && key.authentication) {
-            return {
-                key: key.key,
-                name: key.name,
-                description: key.description,
-                filtersOrder: key.filtersOrder,
-                active: false,
-                authentication: true,
-                documentShow: false,
-                filtersShow: false,
-                filtersSuggest: false,
-                indicesGroup: false,
-                indicesList: false,
-                editorEnabled: false,
-                editorRestricted: false,
-                editorSuggestions: false
+            if (!authed && key.authentication) {
+                return {
+                    key: key.key,
+                    name: key.name,
+                    description: key.description,
+                    filtersOrder: key.filtersOrder,
+                    active: false,
+                    authentication: true,
+                    documentShow: false,
+                    filtersShow: false,
+                    filtersSuggest: false,
+                    indicesGroup: false,
+                    indicesList: false,
+                    editorEnabled: false,
+                    editorRestricted: false,
+                    editorSuggestions: false
+                }
             }
-        }
 
-        return key;
-    }));
+            return key;
+        }));
+    } catch (e) {
+        // Fallback to default document keys when Elasticsearch is offline
+        return JurisprudenciaDocumentKeys.map<JurisprudenciaKey>((key, i) => ({
+            key: key,
+            name: key,
+            description: "Sem descrição",
+            filtersOrder: i + 1,
+            active: true,
+            authentication: false,
+            documentShow: true,
+            filtersShow: true,
+            filtersSuggest: true,
+            indicesGroup: false,
+            indicesList: false,
+            editorEnabled: false,
+            editorRestricted: false,
+            editorSuggestions: false
+        }));
+    }
 }
 
 export function getKey(k: JurisprudenciaDocumentKey) {

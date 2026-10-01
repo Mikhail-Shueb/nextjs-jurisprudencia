@@ -20,22 +20,31 @@ export function withForm<
         const filtersUsed = populateFilters(sfilters, ctx.query)
         const queryObj = createQueryDslQueryContainer(ctx.query.q);
         const authed = await authenticatedHandler(ctx.req);
-        const result = await search(queryObj, sfilters, 0, DEFAULT_AGGS, 0, {track_scores: true, _source: []}, authed)
         let total = 0;
-        if( result.hits.total ){
-            if( Number.isInteger(result.hits.total) ){
-                total = result.hits.total as long;
+        let minAno = 2000;
+        let maxAno = new Date().getFullYear();
+
+        try {
+            const result = await search(queryObj, sfilters, 0, DEFAULT_AGGS, 0, {track_scores: true, _source: []}, authed)
+            if( result.hits.total ){
+                if( Number.isInteger(result.hits.total) ){
+                    total = result.hits.total as long;
+                }
+                else{
+                    total = (result.hits.total as SearchTotalHits).value;
+                }
             }
-            else{
-                total = (result.hits.total as SearchTotalHits).value;
-            }
+            minAno = parseInt((result.aggregations?.MinAno as AggregationsMinAggregate).value_as_string || "") || 2000;
+            maxAno = parseInt((result.aggregations?.MaxAno as AggregationsMaxAggregate).value_as_string || "") || new Date().getFullYear();
+        } catch (e) {
+            console.warn("[withForm] Elasticsearch indisponível. A carregar página com valores padrão.");
         }
         
         let formProps = {
             count: total,
             filtersUsed: filtersUsed,
-            minAno: parseInt((result.aggregations?.MinAno as AggregationsMinAggregate).value_as_string || "") || 0,
-            maxAno: parseInt((result.aggregations?.MaxAno as AggregationsMaxAggregate).value_as_string || "") || Infinity
+            minAno: minAno,
+            maxAno: maxAno
         }
         return {props: await sub(ctx, formProps)}
     }

@@ -56,37 +56,47 @@ async function getClient(){
 
 
 export async function trackApiRequest(req: NextApiRequest, res: NextApiResponse, start: Date, end: Date){
-    let client = await getClient();
-    return await client.index({
-        index: REQUEST_INDEX,
-        body: {
-            method: req.method,
-            url: req.url,
-            status: res.statusCode,
-            start: start.toISOString(),
-            end: end.toISOString(),
-            duration: (+end) - (+start),
-            userAgent: req.headers['user-agent'],
-            ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-            type: "api"
-        }
-    })
+    try {
+        let client = await getClient();
+        return await client.index({
+            index: REQUEST_INDEX,
+            body: {
+                method: req.method,
+                url: req.url,
+                status: res.statusCode,
+                start: start.toISOString(),
+                end: end.toISOString(),
+                duration: (+end) - (+start),
+                userAgent: req.headers['user-agent'],
+                ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+                type: "api"
+            }
+        })
+    } catch (e) {
+        // Silently skip tracking when Elasticsearch is offline
+        return null;
+    }
 }
 
 export async function trackSspRequest(req: IncomingMessage, res: ServerResponse<IncomingMessage>, start: Date, end: Date){
-    let client = await getClient();
-    return await client.index({
-        index: REQUEST_INDEX,
-        body: {
-            method: req.method,
-            url: req.url,
-            status: res.statusCode,
-            start: start.toISOString(),
-            end: end.toISOString(),
-            duration: (+end) - (+start),
-            userAgent: req.headers['user-agent'],
-            ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-            type: "ssp"
-        }
-    })
+    try {
+        let client = await getClient();
+        return await client.index({
+            index: REQUEST_INDEX,
+            body: {
+                method: req.method,
+                url: req.url,
+                status: res.statusCode,
+                start: start.toISOString(),
+                end: end.toISOString(),
+                duration: (+end) - (+start),
+                userAgent: req.headers['user-agent'],
+                ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+                type: "ssp"
+            }
+        })
+    } catch (e) {
+        // Silently skip tracking when Elasticsearch is offline
+        return null;
+    }
 }
