@@ -16,10 +16,7 @@ export default function LoggerApi(cb: NextApiHandler): NextApiHandler{
 export function LoggerServerSideProps(ctx: GetServerSidePropsContext){
     const start = new Date();
     const { req, res } = ctx;
-    
-    res.on("close", () => {
-        const end = new Date();
-        console.log(`[SSP] ${start.toISOString()} ${req.method} ${req.url} ${res.statusCode} ${(+end) - (+start)}ms`);
-        trackSspRequest(req, res, start, end).catch(e => console.log(e));
-    });
+    const statusCode = res.statusCode || 200;
+    console.log(`[SSP] ${start.toISOString()} ${req.method} ${req.url} ${statusCode}`);
+    trackSspRequest(req, res, start, new Date()).catch(() => {});
 }
