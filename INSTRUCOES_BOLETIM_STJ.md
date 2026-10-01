@@ -96,29 +96,79 @@ nextjs-jurisprudencia/
 
 ---
 
-## 4. Instruções de Verificação e Testes
+## 4. Como Iniciar e Apresentar a Demonstração (Demo)
 
-### 4.1. Execução da Suite de Testes do Boletim
-Para verificar a integridade de todas as funções e validações de normalização, extração e indexação:
+### 4.1. Comandos de Inicialização Rápida
+
+Pode iniciar a demonstração de qualquer uma das seguintes formas:
+
+#### Opção A: Arranque com 1 Comando (Recomendado no Terminal)
+Navegar para a pasta `nextjs-jurisprudencia` e executar:
 ```powershell
-node qa-boletim-suite.js
+npm run demo
 ```
-*Resultado esperado:* **27 PASSOU / 0 FALHOU**.
+*(ou simplesmente `npm run dev`)*.  
+O servidor fica ativo em `http://localhost:3000`. Aceda diretamente a:
+👉 **[http://localhost:3000/boletim](http://localhost:3000/boletim)**
 
-### 4.2. Verificação de Tipos TypeScript
+#### Opção B: Arranque Automático em 1 Clique (Windows)
+Fazer duplo-clique no ficheiro executável na raiz do projeto:
+- `start-demo.bat` (ou na pasta `nextjs-jurisprudencia\start-demo.bat`)  
+Este script verifica dependências, arranca o Next.js e abre automaticamente o browser no URL da demo.
+
+---
+
+### 4.2. Roteiro Sugerido para Apresentação da Demo
+
+Para demonstrar as melhorias perante a equipa/orientadores, sugere-se o seguinte roteiro:
+
+1. **Aceder à página de Boletins:**
+   - Abrir `http://localhost:3000/boletim`.
+2. **Demonstrar a Compilação Anual (Doc 1: *2025_Secção Social_Boletim anual.docx*):**
+   - Selecionar a **Secção:** `Secção Social (4.ª Secção)`.
+   - No seletor de mês, escolher: **`Ano Inteiro (Boletim Anual)`**.
+   - Clicar em **"Gerar Pré-visualização"**.
+   - **Destacar:**
+     - O cabeçalho institucional com logótipo oficial do STJ em alta resolução.
+     - Painel do **Colectivo de Juízes**: Relator (ex: *Mário Belo Morgado (Relator)*) e Adjuntos (*Júlio Gomes*, *José Eduardo Sapateiro*, *Albertina Pereira*).
+     - As fórmulas de conformidade eletrónica (art. 153.º CPC) foram limpas, mantendo apenas a identificação rigorosa dos magistrados.
+     - **Permalink público**: hiperligação direta clicável (`juris.stj.pt/...`).
+3. **Demonstrar o Índice Remissivo Alfabético:**
+   - No cabeçalho da pré-visualização, clicar no botão **"Ver Índice Alfabético"**.
+   - A página salta suavemente para o fim do boletim, mostrando a ordenação de **A a Z** dos temas/descritores.
+   - Clicar num dos termos indexados (ex: `#entry-1`) para demonstrar a navegação bidirecional de volta ao acórdão.
+4. **Demonstrar os Cadernos Temáticos:**
+   - No campo **"Descritor / Tema"**, pesquisar por exemplo: `Acordo de empresa` ou `Acidente de trabalho`.
+   - O boletim filtra e agrega acórdãos em torno desse tema específico.
+5. **Demonstrar as Secções Cíveis e Criminais (Docs 2 e 3):**
+   - Alternar para `Secções Cíveis (1.ª, 2.ª e 7.ª Secções)` ou `Secções Criminais (3.ª e 5.ª Secções)`.
+   - Mostrar a adaptação automática da numeração de processos, relatores e descritores correspondentes.
+6. **Demonstrar Impressão / PDF Oficial:**
+   - Clicar em **"Imprimir / Guardar PDF"**.
+   - Demonstrar o preview de impressão com margens normalizadas A4 (2.5 cm e 3.0 cm), sem quebra indesejada no meio dos acórdãos.
+
+---
+
+### 4.3. Comandos de Controlo de Qualidade e Validação Técnica
+
+Para demonstrar a robustez do código durante a apresentação técnica:
+
+#### 1. Suite de Testes Automatizados (27 Testes):
+```powershell
+npm run test:qa
+```
+*(ou `node qa-boletim-suite.js`)*  
+**Resultado:** `27 PASSOU / 0 FALHOU` — valida normalização de nomes, extração de juízes de 3 secções, geração de permalinks e índice alfabético.
+
+#### 2. Validação Estrita de Tipagem TypeScript:
 ```powershell
 npx tsc --noEmit
 ```
-*Resultado esperado:* Saída limpa com código 0 (sem erros de tipagem).
+**Resultado:** Código 0 limpo (sem erros de compilação de tipos).
 
-### 4.3. Compilação de Produção Next.js
+#### 3. Build de Produção:
 ```powershell
 npm run build
 ```
-*Resultado esperado:* Compilação bem-sucedida de todas as rotas e páginas.
+**Resultado:** Todas as páginas compiladas e otimizadas para produção.
 
-### 4.4. Execução Local em Modo de Desenvolvimento
-```powershell
-npm run dev
-```
-Aceder no navegador a: `http://localhost:3000/boletim` para pré-visualizar e descarregar os boletins.
